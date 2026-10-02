@@ -173,7 +173,7 @@ Rectangle {
                 
                 MaterialSymbol {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: Utils.iconFor(panel.entry)
+                    text: Utils.iconFor(panel.entry, win.xdgDirs)
                     color: Appearance.colors.colPrimary
                     iconSize: 44
                 }

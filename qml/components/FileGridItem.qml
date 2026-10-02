@@ -12,6 +12,7 @@ Rectangle {
     required property int index
     property bool selected: false
     property bool hovered: false
+    property var xdgDirs: ({})
 
     signal rowContext(int index, real x, real y)
     signal dropRequested(string target, var uris, bool internal)
@@ -58,7 +59,18 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             width: 64
             height: 64
-            icon.name: DesktopUtils.getIconName(item.modelData.path, item.modelData.dir)
+            icon.name: {
+                if (item.modelData.dir && item.xdgDirs) {
+                    if (item.modelData.path === item.xdgDirs.desktop) return "user-desktop";
+                    if (item.modelData.path === item.xdgDirs.documents) return "folder-documents";
+                    if (item.modelData.path === item.xdgDirs.download) return "folder-download";
+                    if (item.modelData.path === item.xdgDirs.music) return "folder-music";
+                    if (item.modelData.path === item.xdgDirs.pictures) return "folder-pictures";
+                    if (item.modelData.path === item.xdgDirs.videos) return "folder-videos";
+                    if (item.modelData.path === item.xdgDirs.home) return "user-home";
+                }
+                return DesktopUtils.getIconName(item.modelData.path, item.modelData.dir);
+            }
             icon.width: 64
             icon.height: 64
             icon.color: "transparent"

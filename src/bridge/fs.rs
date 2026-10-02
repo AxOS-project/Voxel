@@ -22,6 +22,11 @@ pub struct Fs {
         home_path().to_string_lossy().into_owned().into()
     }),
 
+    // Get XDG dirs as JSON map.
+    xdg_dirs: qt_method!(fn xdg_dirs(&self) -> QString {
+        get_xdg_dirs().into()
+    }),
+
     // Create a directory; returns "" on success or an error message.
     create_dir: qt_method!(fn create_dir(&self, parent: QString, name: QString) -> QString {
         let name = name.to_string();
@@ -125,4 +130,44 @@ fn uris_to_paths(list: &str) -> Vec<PathBuf> {
         .filter(|l| !l.is_empty())
         .map(|l| PathBuf::from(crate::util::text::from_uri(l)))
         .collect()
+}
+
+fn get_xdg_dirs() -> String {
+    let mut dirs = std::collections::HashMap::new();
+    let home = crate::util::path::home();
+    let home_str = home.to_string_lossy().into_owned();
+    dirs.insert("home".to_string(), home_str.clone());
+
+    let config = home.join(".config").join("user-dirs.dirs");
+    if let Ok(content) = std::fs::read_to_string(&config) {
+        for line in content.lines() {
+            if line.starts_with("XDG_") && line.contains('=') {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    let key = parts[0].trim_start_matches("XDG_").trim_end_matches("_DIR").to_lowercase();
+                    let val = parts[1].trim_matches('"').replace("$HOME", &home_str);
+                    dirs.insert(key, val);
+                }
+            }
+        }
+    } else {
+        dirs.insert("desktop".to_string(), format!("{}/Desktop", home_str));
+        dirs.insert("documents".to_string(), format!("{}/Documents", home_str));
+        dirs.insert("download".to_string(), format!("{}/Downloads", home_str));
+        dirs.insert("music".to_string(), format!("{}/Music", home_str));
+        dirs.insert("pictures".to_string(), format!("{}/Pictures", home_str));
+        dirs.insert("videos".to_string(), format!("{}/Videos", home_str));
+    }
+
+    let mut json = String::from("{");
+    let mut first = true;
+    for (k, v) in dirs {
+        if !first {
+            json.push(',');
+        }
+        json.push_str(&format!("\"{}\":\"{}\"", k, v.replace('\"', "\\\"")));
+        first = false;
+    }
+    json.push('}');
+    json
 }

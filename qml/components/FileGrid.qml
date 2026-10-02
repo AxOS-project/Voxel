@@ -13,6 +13,7 @@ Item {
     property var selected: ({})
     property int anchorIndex: -1
     property bool filtered: false
+    property var xdgDirs: ({})
 
 
     signal rowContext(int index, real x, real y)
@@ -87,6 +88,7 @@ Item {
             height: list.cellHeight - 4
             selected: win.isSelected(modelData.path)
             hovered: index === gridContainer.hoverIndex
+            xdgDirs: gridContainer.xdgDirs
             onRowContext: (index, x, y) => gridContainer.rowContext(index, x, y)
             onDropRequested: (target, uris, internal) => gridContainer.dropRequested(target, uris, internal)
         }

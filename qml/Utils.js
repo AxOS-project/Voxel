@@ -61,9 +61,20 @@ function describe(e) {
     return parts.join("  \u00b7  ");
 }
 
-function iconFor(e) {
+function iconFor(e, xdgDirs) {
+    if (!e) return "description";
     if (e.link) return "file_export";
-    if (e.dir) return "folder";
+    if (e.dir) {
+        if (xdgDirs) {
+            if (e.path === xdgDirs.desktop) return "desktop_windows";
+            if (e.path === xdgDirs.documents) return "description";
+            if (e.path === xdgDirs.download) return "file_download";
+            if (e.path === xdgDirs.music) return "library_music";
+            if (e.path === xdgDirs.pictures) return "photo_library";
+            if (e.path === xdgDirs.videos) return "video_library";
+        }
+        return "folder";
+    }
     const n = e.name.toLowerCase();
     if (/\.(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(n)) return "image";
     if (/\.(mp3|flac|wav|ogg|m4a|opus)$/.test(n)) return "music_note";

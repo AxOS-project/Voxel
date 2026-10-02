@@ -38,6 +38,9 @@ Window {
     property string status: ""
     property bool showHidden: false
     property string filter: ""
+    property var xdgDirs: {
+        try { return JSON.parse(fs.xdg_dirs()); } catch(e) { return {}; }
+    }
     // Preview side panel (photos / audio / metadata).
     property bool previewVisible: true
     // Multi-selection: path -> true. `anchor` is the shift-click origin.
@@ -768,6 +771,17 @@ Window {
             onEscaped: root.forceActiveFocus()
         }
 
+        Sidebar {
+            id: sidebar
+            anchors {
+                left: parent.left
+                top: top.bottom; bottom: status.top
+            }
+            curPath: win.curPath
+            xdgDirs: win.xdgDirs
+            onNavigate: (path) => win.navigate(path)
+        }
+
         // ---- preview panel -------------------------------------------------
         PreviewPanel {
             id: previewPanel
@@ -786,9 +800,10 @@ Window {
         FileGrid {
             id: fileGrid
             anchors {
-                left: parent.left; right: previewPanel.left
+                left: sidebar.right; right: previewPanel.left
                 top: top.bottom; bottom: status.top
             }
+            xdgDirs: win.xdgDirs
             model: win.visibleEntries
             currentIndex: win.index
             hoverIndex: win.hoverIndex

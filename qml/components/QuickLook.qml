@@ -315,7 +315,7 @@ Item {
         visible: ql.fallback
         MaterialSymbol {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ql.entry ? Utils.iconFor(ql.entry) : "description"
+            text: ql.entry ? Utils.iconFor(ql.entry, win.xdgDirs) : "description"
             color: Appearance.colors.colPrimary
             iconSize: 72
         }
