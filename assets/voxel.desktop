@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Voxel
+GenericName=File Manager
+Comment=File manager
+Exec=voxel %U
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileManager;Utility;
+MimeType=inode/directory;
+StartupWMClass=voxel
