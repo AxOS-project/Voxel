@@ -792,6 +792,15 @@ Window {
             z: 10
         }
 
+        RoundCorner {
+            anchors.left: sidebar.right
+            anchors.bottom: status.top
+            size: Appearance.rounding.windowRounding
+            color: Appearance.colors.colLayer2
+            corner: cornerEnum.bottomLeft
+            z: 10
+        }
+
         // ---- preview panel -------------------------------------------------
         PreviewPanel {
             id: previewPanel

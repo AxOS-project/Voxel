@@ -18,9 +18,8 @@ Item {
     signal pickerAccept()
 
     Rectangle {
-        anchors { left: parent.left; right: parent.right; top: parent.top }
-        height: 1
-        color: Appearance.colors.colOutlineVariant
+        anchors.fill: parent
+        color: Appearance.colors.colLayer2
     }
     Text {
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
