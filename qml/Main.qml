@@ -43,7 +43,7 @@ Window {
         try { return JSON.parse(fs.xdg_dirs()); } catch(e) { return {}; }
     }
     // Preview side panel (photos / audio / metadata).
-    property bool previewVisible: true
+    property bool previewVisible: false
     // Multi-selection: path -> true. `anchor` is the shift-click origin.
     property var selected: ({})
     property int anchor: -1
