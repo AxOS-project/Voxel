@@ -54,16 +54,7 @@ Item {
         return list.itemAtIndex(index);
     }
 
-    // Background context menu
-    MouseArea {
-        id: listBackground
-        anchors.fill: list
-        acceptedButtons: Qt.RightButton
-        onClicked: (mouse) => {
-            const p = listBackground.mapToItem(null, mouse.x, mouse.y);
-            gridContainer.emptyContext(p.x, p.y);
-        }
-    }
+
 
     GridView {
         id: list
@@ -108,7 +99,7 @@ Item {
         id: listMouse
         anchors.fill: list
         z: 55
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         hoverEnabled: true
         preventStealing: true
 
@@ -150,6 +141,13 @@ Item {
         onExited: gridContainer.hoverIndex = -1
 
         onPressed: mouse => {
+            if (mouse.button === Qt.RightButton) {
+                const i = indexAt(mouse.x, mouse.y);
+                const p = listMouse.mapToItem(null, mouse.x, mouse.y);
+                if (i >= 0) gridContainer.rowContext(i, p.x, p.y);
+                else gridContainer.emptyContext(p.x, p.y);
+                return;
+            }
             pressX = mouse.x;
             pressY = mouse.y;
             banding = false;
@@ -169,7 +167,7 @@ Item {
 
         onPositionChanged: mouse => {
             gridContainer.hoverIndex = indexAt(mouse.x, mouse.y);
-            if (!pressed) return;
+            if (!pressed || (mouse.buttons & Qt.RightButton)) return;
             if (!moved && (Math.abs(mouse.x - pressX) > 6 || Math.abs(mouse.y - pressY) > 6)) moved = true;
             if (listMouse.armed || !moved) return;
             if (!banding) {
@@ -182,6 +180,7 @@ Item {
         }
 
         onReleased: mouse => {
+            if (mouse.button === Qt.RightButton) return;
             if (banding) {
                 gridContainer.marqueeEnd();
                 const rx = Math.min(gridContainer.marqueeX0, gridContainer.marqueeX1);

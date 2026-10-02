@@ -90,14 +90,4 @@ Rectangle {
             maximumLineCount: 2
         }
     }
-
-    MouseArea {
-        id: itemMa
-        anchors.fill: parent
-        acceptedButtons: Qt.RightButton
-        onClicked: mouse => {
-            const p = itemMa.mapToItem(null, mouse.x, mouse.y);
-            item.rowContext(item.index, p.x, p.y);
-        }
-    }
 }
