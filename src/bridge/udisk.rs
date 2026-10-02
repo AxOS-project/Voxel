@@ -61,24 +61,41 @@ impl Udisk {
                 interfaces.get("org.freedesktop.UDisks2.Filesystem"),
             ) else { continue; };
 
-            let is_system = block_props.get("HintSystem").and_then(|v| bool::try_from(v).ok()).unwrap_or(true);
             let is_ignored = block_props.get("HintIgnore").and_then(|v| bool::try_from(v).ok()).unwrap_or(false);
 
-            if is_system || is_ignored { continue; }
+            if is_ignored { continue; }
 
-            let partition_name = block_props.get("IdLabel").and_then(|v| <&str>::try_from(v).ok()).unwrap_or("Unknown");
+            let mount_points = fs_props.get("MountPoints").and_then(|v| <Vec<Vec<u8>>>::try_from(v.clone()).ok()).unwrap_or_default();
+            let mount_paths: Vec<String> = mount_points.iter().map(|bytes| String::from_utf8_lossy(bytes).trim_end_matches('\0').to_string()).collect();
 
-            let mount_points = fs_props.get("MountPoints")
-                .and_then(|v| <Vec<Vec<u8>>>::try_from(v.clone()).ok())
-                .unwrap_or_default();
+            let is_critical_os = mount_paths.iter().any(|p| {
+                p == "/" || p.starts_with("/boot") || p.starts_with("/efi") || p == "/home"
+            });
+
+            if is_critical_os { continue; }
+
+            let mut partition_name = block_props.get("IdLabel").and_then(|v| <&str>::try_from(v).ok()).unwrap_or("Unknown").to_string();
+
+            if partition_name.is_empty() {
+                let size_bytes = block_props.get("Size").and_then(|v| u64::try_from(v).ok()) .unwrap_or(0);
+
+                if size_bytes > 0 {
+                    let size_gb = size_bytes as f64 / 1_073_741_824.0; // 1024^3
+                    
+                    if size_gb >= 1.0 {
+                        partition_name = format!("{:.1} GB Volume", size_gb);
+                    } else {
+                        let size_mb = size_bytes as f64 / 1_048_576.0;
+                        partition_name = format!("{:.0} MB Volume", size_mb);
+                    }
+                } else {
+                    partition_name = "Unknown Volume".to_string();
+                }
+            }
 
             let is_mounted = !mount_points.is_empty();
             
-            let mount_point = if is_mounted {
-                String::from_utf8_lossy(&mount_points[0]).trim_end_matches('\0').to_string()
-            } else {
-                String::new()
-            };
+            let mount_point = if is_mounted { mount_paths[0].clone() } else { String::new() };
 
             devices.push(serde_json::json!({
                 "name": partition_name,
