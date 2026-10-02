@@ -21,6 +21,7 @@ Rectangle {
     onXdgDirsChanged: {
         dirModel.clear();
         if (!xdgDirs || !xdgDirs.home) return;
+        dirModel.append({ name: "Home", path: xdgDirs.home, glyph: "home" });
         if (xdgDirs.desktop) dirModel.append({ name: "Desktop", path: xdgDirs.desktop, glyph: "desktop_windows" });
         if (xdgDirs.documents) dirModel.append({ name: "Documents", path: xdgDirs.documents, glyph: "description" });
         if (xdgDirs.download) dirModel.append({ name: "Downloads", path: xdgDirs.download, glyph: "file_download" });

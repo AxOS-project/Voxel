@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Window
 import Voxel
 import SleexUiKit.Appearance
+import SleexUiKit.Widgets
 import "components"
 import "Utils.js" as Utils
 
@@ -780,6 +781,15 @@ Window {
             curPath: win.curPath
             xdgDirs: win.xdgDirs
             onNavigate: (path) => win.navigate(path)
+        }
+
+        RoundCorner {
+            anchors.left: sidebar.right
+            anchors.top: top.bottom
+            size: Appearance.rounding.windowRounding
+            color: Appearance.colors.colLayer2
+            corner: cornerEnum.topLeft
+            z: 10
         }
 
         // ---- preview panel -------------------------------------------------
