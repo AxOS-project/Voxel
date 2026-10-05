@@ -66,6 +66,8 @@ Window {
     property real marqueeY1: 0
     // Row index under the cursor (drives the hover highlight).
     property int hoverIndex: -1
+    
+    property bool rowLayout: false
 
     readonly property bool overlayOpen:
         menu.shown || prompt.shown || confirm.shown || trashPanel.shown || quickLook.shown
@@ -120,7 +122,10 @@ Window {
         return out;
     }
 
-    onIndexChanged: if (index >= 0) fileGrid.positionViewAtIndex(index, GridView.Contain)
+    onIndexChanged: if (index >= 0) {
+        if (win.rowLayout) fileList.positionViewAtIndex(index, ListView.Contain)
+        else fileGrid.positionViewAtIndex(index, GridView.Contain)
+    }
     onVisibleEntriesChanged: if (win.index >= win.visibleEntries.length)
                                  win.index = Math.max(0, win.visibleEntries.length - 1)
 
@@ -206,9 +211,14 @@ Window {
     function pageMove(dir) {
         const n = win.visibleEntries.length;
         if (n === 0) return;
-        const cols = Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
-        const rows = Math.max(1, Math.floor(fileGrid.gridHeight / fileGrid.cellHeight));
-        const items = cols * rows;
+        let items = 1;
+        if (win.rowLayout) {
+            items = Math.max(1, Math.floor(fileList.listHeight / 36));
+        } else {
+            const cols = Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
+            const rows = Math.max(1, Math.floor(fileGrid.gridHeight / fileGrid.cellHeight));
+            items = cols * rows;
+        }
         if (win.selectedCount > 0) win.selected = ({});
         win.index = Math.max(0, Math.min(n - 1, win.index + dir * items));
     }
@@ -383,7 +393,11 @@ Window {
         const ry = Math.min(win.marqueeY0, win.marqueeY1);
         const rw = Math.abs(win.marqueeX1 - win.marqueeX0);
         const rh = Math.abs(win.marqueeY1 - win.marqueeY0);
-        fileGrid.applyMarquee(rx, ry, rw, rh, fileGrid.contentX, fileGrid.contentY);
+        if (win.rowLayout) {
+            fileList.applyMarquee(rx, ry, rw, rh, 0, fileList.contentY);
+        } else {
+            fileGrid.applyMarquee(rx, ry, rw, rh, fileGrid.contentX, fileGrid.contentY);
+        }
     }
     function handleRowClick(i, modifiers) {
         if (modifiers & Qt.ControlModifier) {
@@ -755,6 +769,7 @@ Window {
             previewVisible: win.previewVisible
             trashCount: win.trashCount
             filter: win.filter
+            rowLayout: win.rowLayout
 
             onGoBack: win.historyBack()
             onGoForward: win.historyForward()
@@ -770,6 +785,7 @@ Window {
             onMoveUp: win.move(-1)
             onMoveDown: win.move(1)
             onEscaped: root.forceActiveFocus()
+            onRowLayoutToggled: win.rowLayout = !win.rowLayout
         }
 
         Sidebar {
@@ -818,6 +834,7 @@ Window {
 
         FileGrid {
             id: fileGrid
+            visible: !win.rowLayout
             anchors {
                 left: sidebar.right; right: previewPanel.left
                 top: top.bottom; bottom: status.top
@@ -854,6 +871,46 @@ Window {
             }
         }
 
+        FileList {
+            id: fileList
+            visible: win.rowLayout
+            anchors {
+                left: sidebar.right; right: previewPanel.left
+                top: top.bottom; bottom: status.top
+            }
+            xdgDirs: win.xdgDirs
+            model: win.visibleEntries
+            currentIndex: win.index
+            hoverIndex: win.hoverIndex
+            anchorIndex: win.anchor
+            filtered: win.filter.length > 0
+
+            onRowContext: (idx, x, y) => win.openMenu(idx, x, y)
+            onDropRequested: (target, uris, internal) => win.handleDrop(target, uris, internal)
+            onEmptyContext: (x, y) => win.openMenu(-1, x, y)
+            onRowClicked: (idx, modifiers) => win.handleRowClick(idx, modifiers)
+            onDoubleClicked: (idx) => win.openIndex(idx)
+            onSelectionCleared: { if (win.selectedCount > 0) win.selected = ({}); }
+
+            onMarqueeBegin: (x, y) => win.marqueeBegin(x, y)
+            onMarqueeUpdate: (x, y) => win.marqueeUpdate(x, y)
+            onMarqueeEnd: () => win.marqueeEnd()
+            onApplyMarquee: (rx, ry, rw, rh, cx, cy) => {
+                const next = {};
+                const entries = win.visibleEntries;
+                for (let i = 0; i < entries.length; i++) {
+                    const item = fileList.itemAtIndex(i);
+                    if (!item) continue;
+                    if (item.x < rx + rw + cx && item.x + item.width > rx + cx
+                            && item.y < ry + rh + cy && item.y + item.height > ry + cy)
+                        next[entries[i].path] = true;
+                }
+                win.selected = next;
+                win.anchor = -1;
+            }
+        }
+
+
         StatusBar {
             id: status
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
@@ -871,14 +928,14 @@ Window {
         // ---- keyboard ------------------------------------------------------
         Keys.onUpPressed: (e) => {
             if (!win.overlayOpen) {
-                const cols = Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
+                const cols = win.rowLayout ? 1 : Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
                 win.move(-cols);
                 e.accepted = true;
             }
         }
         Keys.onDownPressed: (e) => {
             if (!win.overlayOpen) {
-                const cols = Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
+                const cols = win.rowLayout ? 1 : Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
                 win.move(cols);
                 e.accepted = true;
             }

@@ -13,6 +13,7 @@ Item {
     property bool previewVisible: true
     property int trashCount: 0
     property alias filter: search.text
+    property bool rowLayout: false
 
     signal goBack()
     signal goForward()
@@ -28,6 +29,7 @@ Item {
     signal moveUp()
     signal moveDown()
     signal escaped()
+    signal rowLayoutToggled()
 
     function focusSearch() { search.focusInput(); }
 
@@ -65,6 +67,12 @@ Item {
         id: tools
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
         spacing: 6
+
+        BarButton {
+            glyph: top.rowLayout ? "view_list" : "view_module"
+            active: top.rowLayout
+            onActivated: top.rowLayoutToggled()
+        }
 
         SearchField {
             id: search

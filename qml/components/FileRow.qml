@@ -13,20 +13,21 @@ Rectangle {
     property bool selected: false
     // Hover is tracked by the list overlay, not by a MouseArea here.
     property bool hovered: false
+    property var xdgDirs
 
     signal rowContext(int index, real x, real y)
     // A drop landed on this (folder) row: move/copy `uris` into `target`.
     signal dropRequested(string target, var uris, bool internal)
 
     width: ListView.view.width
-    height: Appearance.rowHeight
+    height: 36
     radius: Appearance.rounding.small
     color: row.dropActive ? Qt.rgba(0.84, 0.84, 0.86, 0.18)
          : row.selected ? Qt.rgba(1, 1, 1, 0.11)
          : row.hovered ? Appearance.colors.colLayer0Hover
          : "transparent"
     border.width: row.dropActive ? 1 : 0
-    border.color: Appearance.colors.colPrimaryFile
+    border.color: Appearance.colors.colPrimary
     Behavior on color {
         ColorAnimation {
             duration: 100
@@ -77,16 +78,28 @@ Rectangle {
 
         Button {
             anchors.verticalCenter: parent.verticalCenter
-            width: 24
-            height: 24
-            icon.name: DesktopUtils.getIconName(row.modelData.path, row.modelData.dir)
-            icon.width: 24
-            icon.height: 24
+            width: 36
+            height: 36
+            icon.name: {
+                if (row.modelData.dir && row.xdgDirs) {
+                    if (row.modelData.path === row.xdgDirs.desktop) return "user-desktop";
+                    if (row.modelData.path === row.xdgDirs.documents) return "folder-documents";
+                    if (row.modelData.path === row.xdgDirs.download) return "folder-download";
+                    if (row.modelData.path === row.xdgDirs.music) return "folder-music";
+                    if (row.modelData.path === row.xdgDirs.pictures) return "folder-pictures";
+                    if (row.modelData.path === row.xdgDirs.videos) return "folder-videos";
+                    if (row.modelData.path === row.xdgDirs.home) return "user-home";
+                }
+                return DesktopUtils.getIconName(row.modelData.path, row.modelData.dir);
+            }
+            icon.width: 36
+            icon.height: 36
             icon.color: "transparent"
             background: Item {}
             hoverEnabled: false
             focusPolicy: Qt.NoFocus
         }
+
         Text {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width - 20 - 90 - 130 - 36
@@ -96,6 +109,7 @@ Rectangle {
             font.pixelSize: 13
             elide: Text.ElideRight
         }
+
         Text {
             anchors.verticalCenter: parent.verticalCenter
             width: 90
@@ -105,9 +119,9 @@ Rectangle {
             
             font.pixelSize: 11
         }
+        
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            width: 130
             horizontalAlignment: Text.AlignRight
             text: Utils.fmtTime(row.modelData.mtime)
             color: Appearance.colors.colSubtext
