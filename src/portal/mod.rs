@@ -46,7 +46,12 @@ pub fn serve() {
     std::thread::spawn(move || {
         let built = zbus::blocking::connection::Builder::session()
             .and_then(|b| b.name("org.freedesktop.impl.portal.desktop.voxel"))
-            .and_then(|b| b.serve_at("/org/freedesktop/portal/desktop", backend::Chooser { shared }))
+            .and_then(|b| {
+                b.serve_at(
+                    "/org/freedesktop/portal/desktop",
+                    backend::Chooser { shared },
+                )
+            })
             .and_then(|b| b.build());
         match built {
             Ok(_conn) => loop {

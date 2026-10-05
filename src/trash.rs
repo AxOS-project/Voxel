@@ -119,7 +119,9 @@ fn purge() {
 pub fn trash_paths(paths: &[PathBuf]) -> Result<Vec<String>, String> {
     let root = root();
     let (files, info) = ensure(&root)?;
-    let root_dev = fs::metadata(&root).map(|m| m.dev()).map_err(|e| e.to_string())?;
+    let root_dev = fs::metadata(&root)
+        .map(|m| m.dev())
+        .map_err(|e| e.to_string())?;
     for p in paths {
         let dev = fs::symlink_metadata(p)
             .map(|m| m.dev())

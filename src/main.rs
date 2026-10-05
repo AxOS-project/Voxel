@@ -25,7 +25,10 @@ fn main() {
     voxel::portal::serve();
 
     let mut engine = QmlEngine::new();
-    engine.set_property("VoxelInitialPath".into(), QString::from(initial.as_str()).into());
+    engine.set_property(
+        "VoxelInitialPath".into(),
+        QString::from(initial.as_str()).into(),
+    );
     engine.set_property("VoxelPortalMode".into(), portal_mode.into());
     match std::env::var("VOXEL_QML") {
         Ok(path) => engine.load_file(path.into()),
