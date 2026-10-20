@@ -31,6 +31,12 @@ Window {
     Trash { id: trash }
     Portal { id: portal }
 
+    Component.onCompleted: {
+        // TODO: make this path configurable
+        const home = xdgDirs.home;
+        Appearance.themeLoader.filePath = home + "/.local/state/sleex/user/generated/colors.json"
+    }
+
     // ---- state -------------------------------------------------------------
     property string curPath: ""
     property string curParent: ""
