@@ -1,5 +1,5 @@
 use qmetaobject::prelude::*;
-use std::{collections::HashMap, println};
+use std::{collections::HashMap};
 use zbus::{blocking::fdo::ObjectManagerProxy, blocking::Connection, proxy, Result};
 
 #[derive(QObject, Default)]
