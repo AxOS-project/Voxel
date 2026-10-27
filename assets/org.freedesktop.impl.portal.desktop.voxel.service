@@ -1,3 +1,4 @@
 [D-BUS Service]
 Name=org.freedesktop.impl.portal.desktop.voxel
-Exec=@VOXEL@ --portal
+Exec=/usr/bin/voxel --portal
+SystemdService=voxel-portal.service

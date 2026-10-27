@@ -36,4 +36,5 @@ package() {
     install -Dm644 "assets/voxel.desktop" "$pkgdir/usr/share/applications/voxel.desktop"
     install -Dm644 "assets/voxel.portal" "$pkgdir/usr/share/xdg-desktop-portal/portals/voxel.portal"
     install -Dm644 "assets/org.freedesktop.impl.portal.desktop.voxel.service" "$pkgdir/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.voxel.service"
+    install -Dm644 "assets/voxel-portal.service" "$pkgdir/usr/lib/systemd/user/voxel-portal.service"
 }
