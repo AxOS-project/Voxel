@@ -3,7 +3,7 @@ name = "voxel"
 version = "0.1.0"
 edition = "2021"
 description = "Customizable file manager for AxOS"
-license = "MIT"
+license = "GPL3"
 
 [dependencies]
 qmetaobject = "0.2.10"
