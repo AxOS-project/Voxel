@@ -1,5 +1,5 @@
 pkgname=voxel
-pkgver=0.1.2
+pkgver=1.0
 pkgrel=1
 pkgdesc="A file manager for Sleex written in Rust and QML"
 arch=('x86_64')
