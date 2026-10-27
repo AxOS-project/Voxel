@@ -930,7 +930,7 @@ Window {
             if (menu.shown) { menu.shown = false; e.accepted = true; }
             else if (win.filter.length > 0) { win.filter = ""; top.filter = ""; e.accepted = true; }
             else if (win.selectedCount > 0) { win.selected = ({}); e.accepted = true; }
-            else if (!win.overlayOpen) { win.picker ? win.pickerCancel() : Qt.quit(); e.accepted = true; }
+            else if (!win.overlayOpen) { if (win.picker) { win.pickerCancel(); } e.accepted = true; }
         }
         Keys.onPressed: (e) => {
             if (win.overlayOpen && !menu.shown) { return; }
