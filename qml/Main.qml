@@ -53,10 +53,9 @@ Window {
     // Multi-selection: path -> true. `anchor` is the shift-click origin.
     property var selected: ({})
     property int anchor: -1
-    // Browser-style navigation history and type-ahead buffer.
+    // Browser-style navigation history.
     property var backStack: []
     property var forwardStack: []
-    property string typeAhead: ""
     // Raw JSON of the last listing, used to detect external changes.
     property string listingRaw: ""
     // Number of items currently in the trash (for the toolbar badge).
@@ -195,22 +194,6 @@ Window {
             for (let i = 0; i < list.length; i++) {
                 if (list[i].path === want) { win.index = i; break; }
             }
-        }
-    }
-
-    // Jump to the next entry matching the typed prefix.
-    function typeAheadFind(ch) {
-        win.typeAhead += ch;
-        typeAheadTimer.restart();
-        const q = win.typeAhead.toLowerCase();
-        const list = win.visibleEntries;
-        if (list.length === 0) return;
-        for (let n = 1; n <= list.length; n++) {
-            const i = (win.index + n) % list.length;
-            if (list[i].name.toLowerCase().indexOf(q) === 0) { win.index = i; return; }
-        }
-        for (let i = 0; i < list.length; i++) {
-            if (list[i].name.toLowerCase().indexOf(q) >= 0) { win.index = i; return; }
         }
     }
 
@@ -406,6 +389,7 @@ Window {
         }
     }
     function handleRowClick(i, modifiers) {
+        root.forceActiveFocus();
         if (modifiers & Qt.ControlModifier) {
             win.index = i;
             win.toggleSelect(i);
@@ -758,14 +742,6 @@ Window {
             }
         }
 
-        // Reset the type-ahead prefix after a short pause.
-        Timer {
-            id: typeAheadTimer
-            interval: 800
-            repeat: false
-            onTriggered: win.typeAhead = ""
-        }
-
         TopBar {
             id: top
             anchors { left: parent.left; right: parent.right; top: parent.top }
@@ -777,6 +753,7 @@ Window {
             filter: win.filter
             rowLayout: win.rowLayout
 
+            onFilterChanged: win.filter = top.filter
             onGoBack: win.historyBack()
             onGoForward: win.historyForward()
             onGoUp: win.goUp()
@@ -787,7 +764,7 @@ Window {
             onToggleHidden: win.showHidden = !win.showHidden
             onTogglePreview: win.previewVisible = !win.previewVisible
             onOpenTrash: win.openTrash()
-            onSearchAccepted: win.openIndex(win.index)
+            onSearchAccepted: { root.forceActiveFocus(); win.openIndex(win.index); }
             onMoveUp: win.move(-1)
             onMoveDown: win.move(1)
             onEscaped: root.forceActiveFocus()
@@ -951,6 +928,7 @@ Window {
         Keys.onBackPressed: (e) => { if (!win.overlayOpen) { win.goUp(); e.accepted = true; } }
         Keys.onEscapePressed: (e) => {
             if (menu.shown) { menu.shown = false; e.accepted = true; }
+            else if (win.filter.length > 0) { win.filter = ""; top.filter = ""; e.accepted = true; }
             else if (win.selectedCount > 0) { win.selected = ({}); e.accepted = true; }
             else if (!win.overlayOpen) { win.picker ? win.pickerCancel() : Qt.quit(); e.accepted = true; }
         }
@@ -1027,7 +1005,7 @@ Window {
                 top.focusSearch();
                 e.accepted = true;
             } else if (!ctrl && !alt && e.text.length === 1 && e.text >= " ") {
-                win.typeAheadFind(e.text);
+                top.typeSearch(e.text);
                 e.accepted = true;
             }
         }

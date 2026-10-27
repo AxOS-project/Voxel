@@ -13,6 +13,11 @@ Rectangle {
     signal accepted()
 
     function focusInput() { input.forceActiveFocus(); input.selectAll(); }
+    function appendInput(ch) {
+        input.forceActiveFocus();
+        input.text += ch;
+        input.cursorPosition = input.text.length;
+    }
 
     implicitHeight: 32
     radius: Appearance.rounding.full
@@ -40,7 +45,8 @@ Rectangle {
         selectedTextColor: Appearance.colors.colLayer0
         clip: true
 
-        onAccepted: sf.accepted()
+        Keys.onReturnPressed: (e) => { sf.accepted(); e.accepted = true; }
+        Keys.onEnterPressed: (e) => { sf.accepted(); e.accepted = true; }
         Keys.onDownPressed: (e) => { sf.moveDown(); e.accepted = true; }
         Keys.onUpPressed: (e) => { sf.moveUp(); e.accepted = true; }
         Keys.onEscapePressed: (e) => { input.text = ""; sf.escaped(); e.accepted = true; }

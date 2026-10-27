@@ -32,6 +32,7 @@ Item {
     signal rowLayoutToggled()
 
     function focusSearch() { search.focusInput(); }
+    function typeSearch(ch) { search.appendInput(ch); }
 
     Rectangle {
         anchors.fill: parent
