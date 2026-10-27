@@ -10,6 +10,7 @@ depends=(
     'qt5-declarative'
     'qt5-svg'
     'hicolor-icon-theme'
+    'sleex-ui-kit'
 )
 makedepends=(
     'cargo'
