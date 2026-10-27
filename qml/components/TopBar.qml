@@ -13,7 +13,7 @@ Item {
     property bool previewVisible: true
     property int trashCount: 0
     property alias filter: search.text
-    property alias sortBy: sortCombo.currentText
+    property string sortBy: "Name"
     property bool rowLayout: false
 
     signal goBack()
@@ -31,6 +31,7 @@ Item {
     signal moveDown()
     signal escaped()
     signal rowLayoutToggled()
+    signal sortChanged(string sortBy)
 
     function focusSearch() { search.focusInput(); }
     function typeSearch(ch) { search.appendInput(ch); }
@@ -76,7 +77,11 @@ Item {
             implicitHeight: 32
             icon: "sort"
             model: ["Name", "Date", "Size", "Type"]
-            onActivated: top.escaped()
+            currentIndex: Math.max(0, model.indexOf(top.sortBy))
+            onActivated: (index) => {
+                top.sortChanged(model[index]);
+                top.escaped();
+            }
         }
 
         BarButton {

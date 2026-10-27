@@ -35,6 +35,15 @@ Window {
         // TODO: make this path configurable
         const home = xdgDirs.home;
         Appearance.themeLoader.filePath = home + "/.local/state/sleex/user/generated/colors.json"
+        try {
+            const cfg = JSON.parse(fs.load_config());
+            if (cfg.sortBy) win.sortBy = cfg.sortBy;
+            if (cfg.rowLayout !== undefined) win.rowLayout = !!cfg.rowLayout;
+        } catch (e) {}
+    }
+
+    function saveConfig() {
+        fs.save_config(win.sortBy, win.rowLayout);
     }
 
     // ---- state -------------------------------------------------------------
@@ -766,10 +775,11 @@ Window {
             previewVisible: win.previewVisible
             trashCount: win.trashCount
             filter: win.filter
+            sortBy: win.sortBy
             rowLayout: win.rowLayout
 
             onFilterChanged: win.filter = top.filter
-            onSortByChanged: win.sortBy = top.sortBy
+            onSortChanged: (s) => { win.sortBy = s; win.saveConfig(); }
             onGoBack: win.historyBack()
             onGoForward: win.historyForward()
             onGoUp: win.goUp()
@@ -784,7 +794,7 @@ Window {
             onMoveUp: win.move(-1)
             onMoveDown: win.move(1)
             onEscaped: root.forceActiveFocus()
-            onRowLayoutToggled: win.rowLayout = !win.rowLayout
+            onRowLayoutToggled: { win.rowLayout = !win.rowLayout; win.saveConfig(); }
         }
 
         Sidebar {

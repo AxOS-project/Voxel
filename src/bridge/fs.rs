@@ -33,6 +33,20 @@ pub struct Fs {
         }
     ),
 
+    // Load user config from ~/.config/voxel/voxel.conf as JSON.
+    load_config: qt_method!(
+        fn load_config(&self) -> QString {
+            load_voxel_config().into()
+        }
+    ),
+
+    // Save user config to ~/.config/voxel/voxel.conf in TOML format.
+    save_config: qt_method!(
+        fn save_config(&self, sort_by: QString, row_layout: bool) {
+            save_voxel_config(&sort_by.to_string(), row_layout);
+        }
+    ),
+
     // Create a directory; returns "" on success or an error message.
     create_dir: qt_method!(
         fn create_dir(&self, parent: QString, name: QString) -> QString {
@@ -199,4 +213,66 @@ fn get_xdg_dirs() -> String {
     }
     json.push('}');
     json
+}
+
+fn config_file_path() -> PathBuf {
+    let base = std::env::var("XDG_CONFIG_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| crate::util::path::home().join(".config"));
+    base.join("voxel").join("voxel.conf")
+}
+
+fn load_voxel_config() -> String {
+    let path = config_file_path();
+    let mut sort_by = String::from("Name");
+    let mut row_layout = false;
+
+    if let Ok(content) = fs::read_to_string(&path) {
+        for line in content.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if line.is_empty() || line.starts_with('[') {
+                continue;
+            }
+            if let Some((k, v)) = line.split_once('=') {
+                let key = k.trim();
+                let val = v.trim().trim_matches('"').trim_matches('\'');
+                match key {
+                    "sort_by" => {
+                        if matches!(val, "Name" | "Date" | "Size" | "Type") {
+                            sort_by = val.to_string();
+                        }
+                    }
+                    "row_layout" => {
+                        row_layout = val == "true";
+                    }
+                    "list_type" => {
+                        row_layout = val.eq_ignore_ascii_case("list") || val.eq_ignore_ascii_case("row");
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    format!(
+        "{{\"sortBy\":\"{}\",\"rowLayout\":{}}}",
+        sort_by.replace('\"', "\\\""),
+        row_layout
+    )
+}
+
+fn save_voxel_config(sort_by: &str, row_layout: bool) {
+    let path = config_file_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let list_type = if row_layout { "list" } else { "grid" };
+    let toml = format!(
+        "sort_by = \"{}\"\nlist_type = \"{}\"\n",
+        sort_by.replace('\"', "\\\""),
+        list_type
+    );
+    let _ = fs::write(&path, toml);
 }
