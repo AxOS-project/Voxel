@@ -45,8 +45,6 @@ Item {
         height: Math.min(520, tp.parent ? tp.parent.height - 80 : 440)
         radius: Appearance.rounding.large
         color: Appearance.colors.colLayer2
-        border.width: 1
-        border.color: Appearance.colors.colOutlineVariant
         scale: tp.shown ? 1 : 0.96
         Behavior on scale {
             NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 1.04 }
@@ -72,15 +70,40 @@ Item {
         Row {
             anchors { right: parent.right; rightMargin: 16; top: parent.top; topMargin: 14 }
             spacing: 8
-            ActionButton {
+
+            RippleButton {
                 visible: tp.items.length > 0
-                label: "Empty Trash"
-                danger: true
-                onActivated: tp.emptyRequested()
+                colBackground: Appearance.colors.colErrorContainer
+                colText: Appearance.colors.colError
+
+                height: 32
+                width: 32
+                buttonRadius: Appearance.rounding.full
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "delete_forever"
+                    color: Appearance.colors.colError
+                    iconSize: 18
+                }
+
+                onClicked: tp.emptyRequested()
             }
-            ActionButton {
-                label: "Close"
-                onActivated: tp.shown = false
+
+            RippleButton {
+                anchors.verticalCenter: parent.verticalCenter
+
+                height: 32
+                width: 32
+                buttonRadius: Appearance.rounding.full
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "close"
+                    color: Appearance.colors.colSubtext
+                    iconSize: 18
+                }
+                onClicked: tp.shown = false
             }
         }
 
@@ -143,15 +166,36 @@ Item {
                     id: tActions
                     anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
                     spacing: 6
-                    ActionButton {
-                        label: "Restore"
-                        opacity: trow.modelData.known ? 1 : 0.4
-                        onActivated: if (trow.modelData.known) tp.restoreRequested([trow.modelData.name])
+
+                    RippleButton {
+                        height: 28
+                        width: 28
+                        buttonRadius: Appearance.rounding.full
+                        colBackgroundHover: Appearance.colors.colLayer2
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "restore"
+                            color: trow.modelData.known ? Appearance.colors.colOnLayer0 : Appearance.colors.colSubtext
+                            iconSize: 16
+                        }
+                        onClicked: if (trow.modelData.known) tp.restoreRequested([trow.modelData.name])
                     }
-                    ActionButton {
-                        label: "Delete"
-                        danger: true
-                        onActivated: tp.deleteRequested([trow.modelData.name])
+
+                    RippleButton {
+                        height: 28
+                        width: 28
+                        buttonRadius: Appearance.rounding.full
+                        colBackground: Appearance.colors.colErrorContainer
+                        colText: Appearance.colors.colError
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "delete"
+                            color: Appearance.colors.colError
+                            iconSize: 16
+                        }
+                        onClicked: tp.deleteRequested([trow.modelData.name])
                     }
                 }
                 MouseArea {
