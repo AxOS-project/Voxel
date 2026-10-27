@@ -3,3 +3,5 @@
 result
 .direnv
 .contextProperties.ini
+pkg/
+*.pkg.tar.*
