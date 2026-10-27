@@ -91,6 +91,12 @@ function joinPath(dir, name) {
     return dir.replace(/\/+$/, "") + "/" + name;
 }
 
+// Build a `file://` URI for a local filesystem path.
+function fileUri(path) {
+    if (!path) return "";
+    return "file://" + path.split("/").map(encodeURIComponent).join("/");
+}
+
 // Final component of a path.
 function baseName(path) {
     return path.split("/").pop();

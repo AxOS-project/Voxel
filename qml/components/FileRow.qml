@@ -76,28 +76,49 @@ Rectangle {
         }
         spacing: 12
 
-        Button {
+        Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 36
             height: 36
-            icon.name: {
-                if (row.modelData.dir && row.xdgDirs) {
-                    if (row.modelData.path === row.xdgDirs.desktop) return "user-desktop";
-                    if (row.modelData.path === row.xdgDirs.documents) return "folder-documents";
-                    if (row.modelData.path === row.xdgDirs.download) return "folder-download";
-                    if (row.modelData.path === row.xdgDirs.music) return "folder-music";
-                    if (row.modelData.path === row.xdgDirs.pictures) return "folder-pictures";
-                    if (row.modelData.path === row.xdgDirs.videos) return "folder-videos";
-                    if (row.modelData.path === row.xdgDirs.home) return "user-home";
+
+            readonly property bool isImg: Utils.isImage(row.modelData)
+
+            Button {
+                anchors.fill: parent
+                visible: !parent.isImg || thumb.status !== Image.Ready
+                icon.name: {
+                    if (row.modelData.dir && row.xdgDirs) {
+                        if (row.modelData.path === row.xdgDirs.desktop) return "user-desktop";
+                        if (row.modelData.path === row.xdgDirs.documents) return "folder-documents";
+                        if (row.modelData.path === row.xdgDirs.download) return "folder-download";
+                        if (row.modelData.path === row.xdgDirs.music) return "folder-music";
+                        if (row.modelData.path === row.xdgDirs.pictures) return "folder-pictures";
+                        if (row.modelData.path === row.xdgDirs.videos) return "folder-videos";
+                        if (row.modelData.path === row.xdgDirs.home) return "user-home";
+                    }
+                    return DesktopUtils.getIconName(row.modelData.path, row.modelData.dir);
                 }
-                return DesktopUtils.getIconName(row.modelData.path, row.modelData.dir);
+                icon.width: 36
+                icon.height: 36
+                icon.color: "transparent"
+                background: Item {}
+                hoverEnabled: false
+                focusPolicy: Qt.NoFocus
             }
-            icon.width: 36
-            icon.height: 36
-            icon.color: "transparent"
-            background: Item {}
-            hoverEnabled: false
-            focusPolicy: Qt.NoFocus
+
+            Image {
+                id: thumb
+                anchors.fill: parent
+                anchors.margins: 2
+                visible: parent.isImg && status === Image.Ready
+                source: parent.isImg ? Utils.fileUri(row.modelData.path) : ""
+                asynchronous: true
+                cache: true
+                sourceSize.width: 72
+                sourceSize.height: 72
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
         }
 
         Text {
