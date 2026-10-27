@@ -13,6 +13,7 @@ Item {
     property bool previewVisible: true
     property int trashCount: 0
     property alias filter: search.text
+    property alias sortBy: sortCombo.currentText
     property bool rowLayout: false
 
     signal goBack()
@@ -68,6 +69,15 @@ Item {
         id: tools
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
         spacing: 6
+
+        IconComboBox {
+            id: sortCombo
+            anchors.verticalCenter: parent.verticalCenter
+            implicitHeight: 32
+            icon: "sort"
+            model: ["Name", "Date", "Size", "Type"]
+            onActivated: top.escaped()
+        }
 
         BarButton {
             glyph: top.rowLayout ? "view_list" : "view_module"

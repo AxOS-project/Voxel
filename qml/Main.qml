@@ -45,6 +45,7 @@ Window {
     property string status: ""
     property bool showHidden: false
     property string filter: ""
+    property string sortBy: "Name"
     property var xdgDirs: {
         try { return JSON.parse(fs.xdg_dirs()); } catch(e) { return {}; }
     }
@@ -79,6 +80,7 @@ Window {
 
     readonly property var visibleEntries: {
         const q = win.filter.toLowerCase();
+        const sort = win.sortBy;
         const src = win.entries || [];
         const out = [];
         for (let i = 0; i < src.length; i++) {
@@ -86,6 +88,19 @@ Window {
             if (!win.showHidden && e.hidden) continue;
             if (q.length > 0 && e.name.toLowerCase().indexOf(q) < 0) continue;
             out.push(e);
+        }
+        if (sort && sort !== "Name") {
+            out.sort((a, b) => {
+                if (a.dir !== b.dir) return a.dir ? -1 : 1;
+                if (sort === "Date") return (b.mtime - a.mtime) || a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                if (sort === "Size") return (b.bytes - a.bytes) || a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                if (sort === "Type") {
+                    const extA = a.name.lastIndexOf(".") > 0 ? a.name.slice(a.name.lastIndexOf(".") + 1).toLowerCase() : "";
+                    const extB = b.name.lastIndexOf(".") > 0 ? b.name.slice(b.name.lastIndexOf(".") + 1).toLowerCase() : "";
+                    return extA.localeCompare(extB) || a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                }
+                return 0;
+            });
         }
         return out;
     }
@@ -754,6 +769,7 @@ Window {
             rowLayout: win.rowLayout
 
             onFilterChanged: win.filter = top.filter
+            onSortByChanged: win.sortBy = top.sortBy
             onGoBack: win.historyBack()
             onGoForward: win.historyForward()
             onGoUp: win.goUp()
