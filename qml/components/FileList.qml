@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
+import SleexUiKit.Functions
 import "../Utils.js" as Utils
 
 Item {
@@ -39,6 +40,7 @@ Item {
     // Provide access to the grid view for keyboard scrolling, etc.
     property alias listWidth: list.width
     property alias listHeight: list.height
+    property alias contentX: list.contentX
     property alias contentY: list.contentY
     property alias contentHeight: list.contentHeight
 
@@ -173,11 +175,9 @@ Item {
             if (listMouse.armed || !moved) return;
             if (!banding) {
                 banding = true;
-                const p0 = listMouse.mapToItem(null, pressX, pressY);
-                gridContainer.marqueeBegin(p0.x, p0.y);
+                gridContainer.marqueeBegin(pressX, pressY);
             }
-            const p = listMouse.mapToItem(null, mouse.x, mouse.y);
-            gridContainer.marqueeUpdate(p.x, p.y);
+            gridContainer.marqueeUpdate(mouse.x, mouse.y);
         }
 
         onReleased: mouse => {
@@ -188,9 +188,7 @@ Item {
                 const ry = Math.min(gridContainer.marqueeY0, gridContainer.marqueeY1);
                 const rw = Math.abs(gridContainer.marqueeX1 - gridContainer.marqueeX0);
                 const rh = Math.abs(gridContainer.marqueeY1 - gridContainer.marqueeY0);
-                const tl = list.mapFromItem(null, rx, ry);
-                const br = list.mapFromItem(null, rx + rw, ry + rh);
-                gridContainer.applyMarquee(tl.x, tl.y, br.x - tl.x, br.y - tl.y, list.contentX, list.contentY);
+                gridContainer.applyMarquee(rx, ry, rw, rh, list.contentX, list.contentY);
             } else if (!moved) {
                 if (pressIndex >= 0) {
                     gridContainer.rowClicked(pressIndex, mouse.modifiers);
@@ -243,9 +241,9 @@ Item {
         y: Math.min(gridContainer.marqueeY0, gridContainer.marqueeY1)
         width: Math.abs(gridContainer.marqueeX1 - gridContainer.marqueeX0)
         height: Math.abs(gridContainer.marqueeY1 - gridContainer.marqueeY0)
-        color: Qt.rgba(1, 1, 1, 0.08)
+        color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.3)
         border.width: 1
         border.color: Appearance.colors.colPrimary
-        radius: 2
+        radius: Appearance.rounding.small
     }
 }

@@ -407,9 +407,9 @@ Window {
         const rw = Math.abs(win.marqueeX1 - win.marqueeX0);
         const rh = Math.abs(win.marqueeY1 - win.marqueeY0);
         if (win.rowLayout) {
-            fileList.applyMarquee(rx, ry, rw, rh, 0, fileList.contentY);
+            fileList.applyMarquee(rx, ry, rw, rh, fileList.contentX || 0, fileList.contentY);
         } else {
-            fileGrid.applyMarquee(rx, ry, rw, rh, fileGrid.contentX, fileGrid.contentY);
+            fileGrid.applyMarquee(rx, ry, rw, rh, fileGrid.contentX || 0, fileGrid.contentY);
         }
     }
     function handleRowClick(i, modifiers) {
@@ -854,6 +854,11 @@ Window {
             hoverIndex: win.hoverIndex
             anchorIndex: win.anchor
             filtered: win.filter.length > 0
+            marqueeActive: win.marqueeActive
+            marqueeX0: win.marqueeX0
+            marqueeY0: win.marqueeY0
+            marqueeX1: win.marqueeX1
+            marqueeY1: win.marqueeY1
 
             onRowContext: (idx, x, y) => win.openMenu(idx, x, y)
             onDropRequested: (target, uris, internal) => win.handleDrop(target, uris, internal)
@@ -868,11 +873,12 @@ Window {
             onApplyMarquee: (rx, ry, rw, rh, cx, cy) => {
                 const next = {};
                 const entries = win.visibleEntries;
+                const cols = Math.max(1, Math.floor(fileGrid.gridWidth / fileGrid.cellWidth));
                 for (let i = 0; i < entries.length; i++) {
-                    const item = fileGrid.itemAtIndex(i);
-                    if (!item) continue;
-                    if (item.x < rx + rw + cx && item.x + item.width > rx + cx
-                            && item.y < ry + rh + cy && item.y + item.height > ry + cy)
+                    const ix = (i % cols) * fileGrid.cellWidth;
+                    const iy = Math.floor(i / cols) * fileGrid.cellHeight;
+                    if (ix < rx + rw + cx && ix + fileGrid.cellWidth > rx + cx
+                            && iy < ry + rh + cy && iy + fileGrid.cellHeight > ry + cy)
                         next[entries[i].path] = true;
                 }
                 win.selected = next;
@@ -893,6 +899,11 @@ Window {
             hoverIndex: win.hoverIndex
             anchorIndex: win.anchor
             filtered: win.filter.length > 0
+            marqueeActive: win.marqueeActive
+            marqueeX0: win.marqueeX0
+            marqueeY0: win.marqueeY0
+            marqueeX1: win.marqueeX1
+            marqueeY1: win.marqueeY1
 
             onRowContext: (idx, x, y) => win.openMenu(idx, x, y)
             onDropRequested: (target, uris, internal) => win.handleDrop(target, uris, internal)
@@ -908,10 +919,9 @@ Window {
                 const next = {};
                 const entries = win.visibleEntries;
                 for (let i = 0; i < entries.length; i++) {
-                    const item = fileList.itemAtIndex(i);
-                    if (!item) continue;
-                    if (item.x < rx + rw + cx && item.x + item.width > rx + cx
-                            && item.y < ry + rh + cy && item.y + item.height > ry + cy)
+                    const iy = i * 36;
+                    if (0 < rx + rw + cx && fileList.listWidth > rx + cx
+                            && iy < ry + rh + cy && iy + 36 > ry + cy)
                         next[entries[i].path] = true;
                 }
                 win.selected = next;
