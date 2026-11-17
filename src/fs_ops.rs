@@ -226,3 +226,66 @@ pub fn dir_size(path: &Path) -> u64 {
         meta.len()
     }
 }
+
+fn uid_to_name(uid: u32) -> String {
+    static USERS: std::sync::OnceLock<std::collections::HashMap<u32, String>> =
+        std::sync::OnceLock::new();
+    let map = USERS.get_or_init(|| {
+        let mut m = std::collections::HashMap::new();
+        if let Ok(content) = fs::read_to_string("/etc/passwd") {
+            for line in content.lines() {
+                let mut parts = line.split(':');
+                if let (Some(name), Some(_pw), Some(uid_str)) =
+                    (parts.next(), parts.next(), parts.next())
+                {
+                    if let Ok(id) = uid_str.parse::<u32>() {
+                        m.insert(id, name.to_owned());
+                    }
+                }
+            }
+        }
+        m
+    });
+    map.get(&uid).cloned().unwrap_or_else(|| uid.to_string())
+}
+
+/// Detailed metadata for an entry (used by the hover popup):
+/// `{dir, bytes, count, created, modified, owner}`.
+pub fn entry_info(path: &Path, show_hidden: bool) -> String {
+    let meta = match fs::metadata(path).or_else(|_| fs::symlink_metadata(path)) {
+        Ok(m) => m,
+        Err(e) => return format!("{{\"error\":\"{}\"}}", esc(&e.to_string())),
+    };
+    let is_dir = meta.is_dir();
+    let bytes = meta.len();
+    let mtime = meta.mtime();
+    let created = meta
+        .created()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or_else(|| meta.ctime());
+    let owner = uid_to_name(meta.uid());
+    let count: i64 = if is_dir {
+        match fs::read_dir(path) {
+            Ok(rd) => rd
+                .flatten()
+                .filter(|e| {
+                    show_hidden || !e.file_name().to_string_lossy().starts_with('.')
+                })
+                .count() as i64,
+            Err(_) => 0,
+        }
+    } else {
+        -1
+    };
+    format!(
+        "{{\"dir\":{},\"bytes\":{},\"count\":{},\"created\":{},\"modified\":{},\"owner\":\"{}\"}}",
+        is_dir,
+        bytes,
+        count,
+        created,
+        mtime,
+        esc(&owner)
+    )
+}

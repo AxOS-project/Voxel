@@ -161,6 +161,13 @@ pub struct Fs {
             }
         }
     ),
+
+    // Detailed metadata JSON for a hovered entry: {dir, bytes, count, created, modified, owner}.
+    entry_info: qt_method!(
+        fn entry_info(&self, path: QString, show_hidden: bool) -> QString {
+            crate::fs_ops::entry_info(&PathBuf::from(path.to_string()), show_hidden).into()
+        }
+    ),
 }
 
 /// Parse a newline-separated list of `file://` URIs into local paths.

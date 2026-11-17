@@ -90,8 +90,58 @@ Window {
     property real marqueeY1: 0
     // Row index under the cursor (drives the hover highlight).
     property int hoverIndex: -1
+    property real hoverMouseX: 0
+    property real hoverMouseY: 0
+    property bool hoverPopupShown: false
+    property var hoverEntryInfo: null
     
     property bool rowLayout: false
+
+    readonly property var hoveredEntry: {
+        const list = win.visibleEntries;
+        return (win.hoverIndex >= 0 && win.hoverIndex < list.length) ? list[win.hoverIndex] : null;
+    }
+
+    onHoverIndexChanged: {
+        win.hoverPopupShown = false;
+        win.hoverEntryInfo = null;
+        if (win.hoverIndex >= 0 && !win.overlayOpen && !win.marqueeActive) {
+            hoverTimer.restart();
+        } else {
+            hoverTimer.stop();
+        }
+    }
+
+    onOverlayOpenChanged: if (win.overlayOpen) {
+        win.hoverPopupShown = false;
+        hoverTimer.stop();
+    }
+
+    function updateHover(idx, sx, sy) {
+        win.hoverMouseX = sx;
+        win.hoverMouseY = sy;
+        if (win.hoverIndex !== idx) {
+            win.hoverIndex = idx;
+        } else if (win.hoverPopupShown) {
+            win.positionHoverPopup();
+        }
+    }
+
+    function hideHoverPopup() {
+        win.hoverPopupShown = false;
+        hoverTimer.stop();
+    }
+
+    function positionHoverPopup() {
+        let px = win.hoverMouseX + 14;
+        let py = win.hoverMouseY + 16;
+        if (px + hoverPopup.width + 12 > win.width)
+            px = Math.max(8, win.hoverMouseX - hoverPopup.width - 10);
+        if (py + hoverPopup.height + 40 > win.height)
+            py = Math.max(56, win.hoverMouseY - hoverPopup.height - 10);
+        hoverPopup.x = px;
+        hoverPopup.y = py;
+    }
 
     readonly property bool overlayOpen:
         menu.shown || prompt.shown || confirm.shown || trashPanel.shown || quickLook.shown
@@ -182,6 +232,8 @@ Window {
         }
         win.animateEntrance = true;
         entranceResetTimer.restart();
+        win.hideHoverPopup();
+        win.hoverIndex = -1;
         win.suppressIndexScroll = true;
         win.listingRaw = raw;
         win.curPath = data.path;
@@ -872,6 +924,23 @@ Window {
             onTriggered: win.animateEntrance = false
         }
 
+        // Show hover metadata popup after a brief pause on an entry.
+        Timer {
+            id: hoverTimer
+            interval: 320
+            repeat: false
+            onTriggered: {
+                if (!win.hoveredEntry || win.overlayOpen || win.marqueeActive) return;
+                const raw = fs.entry_info(win.hoveredEntry.path, win.showHidden);
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (!parsed.error) win.hoverEntryInfo = parsed;
+                } catch (e) {}
+                win.positionHoverPopup();
+                win.hoverPopupShown = true;
+            }
+        }
+
         // Poll the Rust portal backend for pending FileChooser requests.
         Timer {
             interval: 200
@@ -1230,6 +1299,13 @@ Window {
             readText: function(path, max) { return preview.read_text(path, max); }
             onStepRequested: (delta) => win.quickLookStep(delta)
             onClosed: root.forceActiveFocus()
+        }
+
+        HoverPopup {
+            id: hoverPopup
+            shown: win.hoverPopupShown && !win.overlayOpen && !win.marqueeActive
+            entry: win.hoveredEntry
+            info: win.hoverEntryInfo
         }
 
         ProgressPopup {

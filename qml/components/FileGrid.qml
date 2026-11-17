@@ -138,10 +138,14 @@ Item {
             return !!e && win.isSelected(e.path);
         }
 
-        onEntered: gridContainer.hoverIndex = indexAt(mouseX, mouseY)
-        onExited: gridContainer.hoverIndex = -1
+        onEntered: {
+            const p = listMouse.mapToItem(null, mouseX, mouseY);
+            win.updateHover(indexAt(mouseX, mouseY), p.x, p.y);
+        }
+        onExited: win.updateHover(-1, 0, 0)
 
         onPressed: mouse => {
+            win.hideHoverPopup();
             if (mouse.button === Qt.RightButton) {
                 const i = indexAt(mouse.x, mouse.y);
                 const p = listMouse.mapToItem(null, mouse.x, mouse.y);
@@ -155,12 +159,15 @@ Item {
             moved = false;
             doubleClickedFlag = false;
             pressIndex = indexAt(mouse.x, mouse.y);
-            gridContainer.hoverIndex = pressIndex;
+            const p = listMouse.mapToItem(null, mouse.x, mouse.y);
+            win.updateHover(pressIndex, p.x, p.y);
+            win.hideHoverPopup();
             armed = pressIndex >= 0 && selectedAt(pressIndex);
         }
 
         onPositionChanged: mouse => {
-            gridContainer.hoverIndex = indexAt(mouse.x, mouse.y);
+            const p = listMouse.mapToItem(null, mouse.x, mouse.y);
+            win.updateHover(indexAt(mouse.x, mouse.y), p.x, p.y);
             if (!pressed || (mouse.buttons & Qt.RightButton)) return;
             if (!moved && (Math.abs(mouse.x - pressX) > 6 || Math.abs(mouse.y - pressY) > 6)) {
                 moved = true;
