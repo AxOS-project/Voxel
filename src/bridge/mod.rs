@@ -4,6 +4,7 @@ mod clipboard;
 mod fs;
 mod portal;
 mod preview;
+mod tasks;
 mod trash;
 mod udisk;
 
@@ -15,6 +16,7 @@ pub fn register() {
     qml_register_type::<fs::Fs>(cstr!("Voxel"), 1, 0, cstr!("Fs"));
     qml_register_type::<clipboard::Clipboard>(cstr!("Voxel"), 1, 0, cstr!("Clipboard"));
     qml_register_type::<preview::Preview>(cstr!("Voxel"), 1, 0, cstr!("Preview"));
+    qml_register_type::<tasks::Tasks>(cstr!("Voxel"), 1, 0, cstr!("Tasks"));
     qml_register_type::<trash::Trash>(cstr!("Voxel"), 1, 0, cstr!("Trash"));
     qml_register_type::<portal::Portal>(cstr!("Voxel"), 1, 0, cstr!("Portal"));
     qml_register_type::<udisk::Udisk>(cstr!("Voxel"), 1, 0, cstr!("Udisk"));

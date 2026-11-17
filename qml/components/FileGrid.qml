@@ -56,7 +56,12 @@ Item {
         return list.itemAtIndex(index);
     }
 
-
+    function restoreViewState(idx, cy) {
+        list.currentIndex = idx;
+        list.currentIndex = Qt.binding(function() { return gridContainer.currentIndex; });
+        const maxCy = Math.max(0, list.contentHeight - list.height);
+        list.contentY = Math.max(0, Math.min(cy, maxCy));
+    }
 
     GridView {
         id: list
@@ -70,10 +75,24 @@ Item {
         cellWidth: 125
         cellHeight: 125
 
-        highlightMoveDuration: 150
+        highlightFollowsCurrentItem: false
         highlight: Rectangle {
+            width: list.cellWidth - 4
+            height: list.cellHeight - 4
+            x: list.currentItem ? list.currentItem.x : 0
+            y: list.currentItem ? list.currentItem.y : 0
+            visible: list.currentItem !== null
             color: Qt.rgba(1, 1, 1, 0.06)
             radius: Appearance.rounding.small
+
+            Behavior on x {
+                enabled: !win.suppressIndexScroll
+                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            }
+            Behavior on y {
+                enabled: !win.suppressIndexScroll
+                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            }
         }
 
         delegate: FileGridItem {

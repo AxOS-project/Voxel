@@ -28,13 +28,13 @@ Rectangle {
     border.color: Appearance.colors.colPrimary
     Behavior on color { ColorAnimation { duration: 100 } }
 
-    opacity: 0
+    opacity: win.animateEntrance ? 0 : 1
     SequentialAnimation {
         id: entrance
         PauseAnimation { duration: Math.min(item.index, 10) * 12 }
         NumberAnimation { target: item; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
     }
-    Component.onCompleted: entrance.start()
+    Component.onCompleted: if (win.animateEntrance) entrance.start()
 
     DropArea {
         id: dropTarget
@@ -54,6 +54,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 8
+        opacity: win.isCut(item.modelData.path) ? 0.55 : 1.0
 
         Item {
             anchors.horizontalCenter: parent.horizontalCenter

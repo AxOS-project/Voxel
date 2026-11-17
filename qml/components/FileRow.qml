@@ -34,7 +34,7 @@ Rectangle {
         }
     }
 
-    opacity: 0
+    opacity: win.animateEntrance ? 0 : 1
     SequentialAnimation {
         id: entrance
         PauseAnimation {
@@ -48,7 +48,7 @@ Rectangle {
             easing.type: Easing.OutCubic
         }
     }
-    Component.onCompleted: entrance.start()
+    Component.onCompleted: if (win.animateEntrance) entrance.start()
 
     // Drop target for folder rows: move the dragged selection inside.
     DropArea {
@@ -75,6 +75,7 @@ Rectangle {
             rightMargin: 14
         }
         spacing: 12
+        opacity: win.isCut(row.modelData.path) ? 0.55 : 1.0
 
         Item {
             anchors.verticalCenter: parent.verticalCenter

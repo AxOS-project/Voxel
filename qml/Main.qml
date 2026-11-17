@@ -28,6 +28,7 @@ Window {
     Fs { id: fs }
     Preview { id: preview }
     Clipboard { id: clipboard }
+    Tasks { id: tasks }
     Trash { id: trash }
     Portal { id: portal }
 
@@ -72,6 +73,14 @@ Window {
     property int trashCount: 0
     // Pending operation launched from a prompt/confirm dialog.
     property var pendingOp: ({})
+    // Active background file operations shown in the bottom-right popup.
+    property var activeTasks: []
+    // Paths currently cut to the clipboard (path -> true).
+    property var cutPaths: ({})
+    // Whether newly created delegates should play the entrance animation.
+    property bool animateEntrance: true
+    // Suppress automatic view scrolling while restoring index in-place.
+    property bool suppressIndexScroll: false
 
     // Rubber-band selection rectangle, in scene coordinates.
     property bool marqueeActive: false
@@ -151,7 +160,7 @@ Window {
         return out;
     }
 
-    onIndexChanged: if (index >= 0) {
+    onIndexChanged: if (index >= 0 && !win.suppressIndexScroll) {
         if (win.rowLayout) fileList.positionViewAtIndex(index, ListView.Contain)
         else fileGrid.positionViewAtIndex(index, GridView.Contain)
     }
@@ -169,6 +178,8 @@ Window {
             win.toastMsg(data.error);
             return false;
         }
+        win.animateEntrance = true;
+        entranceResetTimer.restart();
         win.listingRaw = raw;
         win.curPath = data.path;
         win.curParent = data.parent;
@@ -178,6 +189,8 @@ Window {
         win.anchor = -1;
         if (!keepFilter) { win.filter = ""; top.filter = ""; }
         win.status = (data.entries ? data.entries.length : 0) + " items";
+        fileList.restoreViewState(0, 0);
+        fileGrid.restoreViewState(0, 0);
         return true;
     }
 
@@ -209,16 +222,71 @@ Window {
         if (from !== "") win.backStack = win.backStack.concat([from]);
     }
 
-    function refresh(selectPath) {
-        const sel = win.visibleEntries[win.index];
-        const want = selectPath !== undefined ? selectPath : (sel ? sel.path : null);
-        win.load(win.curPath, true);
-        if (want) {
+    // Apply a JSON directory listing in place without re-running entrance
+    // animations or resetting the scroll position.
+    function applyListingInPlace(raw, selectPath) {
+        let data;
+        try { data = JSON.parse(raw); } catch (e) { return; }
+        if (data.error !== undefined || data.path !== win.curPath) return;
+
+        const savedListY = fileList.contentY;
+        const savedGridY = fileGrid.contentY;
+        const activePath = selectPath !== undefined && selectPath !== null
+            ? selectPath
+            : (win.activeEntry ? win.activeEntry.path : null);
+        const prev = win.selected || {};
+        const wasSelected = [];
+        for (const k in prev) if (prev[k]) wasSelected.push(k);
+
+        win.animateEntrance = false;
+        win.suppressIndexScroll = true;
+
+        win.listingRaw = raw;
+        win.curParent = data.parent;
+        win.entries = data.entries;
+        win.status = (data.entries ? data.entries.length : 0) + " items";
+
+        const present = {};
+        for (let i = 0; i < data.entries.length; i++) present[data.entries[i].path] = true;
+
+        const next = {};
+        let any = false;
+        for (let i = 0; i < wasSelected.length; i++) {
+            if (present[wasSelected[i]]) { next[wasSelected[i]] = true; any = true; }
+        }
+        win.selected = any ? next : ({});
+
+        if (activePath !== null && present[activePath]) {
             const list = win.visibleEntries;
             for (let i = 0; i < list.length; i++) {
-                if (list[i].path === want) { win.index = i; break; }
+                if (list[i].path === activePath) { win.index = i; break; }
             }
+        } else if (win.index >= win.visibleEntries.length) {
+            win.index = Math.max(0, win.visibleEntries.length - 1);
         }
+
+        const restoreScroll = function() {
+            fileList.restoreViewState(win.index, savedListY);
+            fileGrid.restoreViewState(win.index, savedGridY);
+        };
+        restoreScroll();
+
+        if (selectPath !== undefined && selectPath !== null) {
+            win.suppressIndexScroll = false;
+            if (win.rowLayout) fileList.positionViewAtIndex(win.index, ListView.Contain);
+            else fileGrid.positionViewAtIndex(win.index, GridView.Contain);
+        } else {
+            Qt.callLater(function() {
+                restoreScroll();
+                win.suppressIndexScroll = false;
+            });
+        }
+    }
+
+    function refresh(selectPath) {
+        if (win.curPath === "") return;
+        const raw = fs.list_json(win.curPath);
+        win.applyListingInPlace(raw, selectPath);
     }
 
     function pageMove(dir) {
@@ -266,38 +334,26 @@ Window {
         if (win.overlayOpen || win.curPath === "") return;
         const raw = fs.list_json(win.curPath);
         if (raw === win.listingRaw) return;
-        let data;
-        try { data = JSON.parse(raw); } catch (e) { return; }
-        if (data.error !== undefined || data.path !== win.curPath) return;
-
-        // Snapshot where the user is before the model changes.
-        const activePath = win.activeEntry ? win.activeEntry.path : null;
-        const prev = win.selected || {};
-        const wasSelected = [];
-        for (const k in prev) if (prev[k]) wasSelected.push(k);
-
-        win.listingRaw = raw;
-        win.curParent = data.parent;
-        win.entries = data.entries;
-
-        const present = {};
-        for (let i = 0; i < data.entries.length; i++) present[data.entries[i].path] = true;
-
-        const next = {};
-        let any = false;
-        for (let i = 0; i < wasSelected.length; i++) {
-            if (present[wasSelected[i]]) { next[wasSelected[i]] = true; any = true; }
-        }
-        win.selected = any ? next : ({});
-
-        if (activePath !== null && present[activePath]) {
-            const list = win.visibleEntries;
-            for (let i = 0; i < list.length; i++) {
-                if (list[i].path === activePath) { win.index = i; break; }
+        if (win.activeTasks.length > 0) {
+            let data;
+            try { data = JSON.parse(raw); } catch (e) { return; }
+            const oldEntries = win.entries || [];
+            const newEntries = (data && data.entries) || [];
+            if (oldEntries.length === newEntries.length) {
+                let samePaths = true;
+                for (let i = 0; i < oldEntries.length; i++) {
+                    if (oldEntries[i].path !== newEntries[i].path) {
+                        samePaths = false;
+                        break;
+                    }
+                }
+                if (samePaths) {
+                    win.listingRaw = raw;
+                    return;
+                }
             }
-        } else if (win.index >= win.visibleEntries.length) {
-            win.index = Math.max(0, win.visibleEntries.length - 1);
         }
+        win.applyListingInPlace(raw, undefined);
     }
 
     function goHome() { win.navigate(fs.home()); }
@@ -312,6 +368,7 @@ Window {
 
     // ---- selection ---------------------------------------------------------
     function isSelected(path) { return !!(win.selected && win.selected[path]); }
+    function isCut(path) { return !!(win.cutPaths && win.cutPaths[path]); }
 
     function selectOnly(i) {
         const e = win.visibleEntries[i];
@@ -376,12 +433,9 @@ Window {
     function handleDrop(target, uris, internal) {
         if (!target || !uris || uris.length === 0) return;
         const joined = uris.join("\n");
-        const err = internal ? fs.move_uris(target, joined) : fs.copy_uris(target, joined);
-        if (err) { win.toastMsg(err); return; }
-        win.toastMsg(internal
-                     ? (uris.length > 1 ? "Moved " + uris.length + " items" : "Moved")
-                     : (uris.length > 1 ? "Copied " + uris.length + " items" : "Copied"));
-        win.refresh();
+        if (internal) tasks.move_uris(target, joined);
+        else tasks.copy_uris(target, joined);
+        win.pollTasks();
     }
 
     // ---- rubber-band selection --------------------------------------------
@@ -427,12 +481,23 @@ Window {
         }
     }
 
-    // ---- copy / paste ------------------------------------------------------
+    // ---- copy / cut / paste ------------------------------------------------
     function copySelection() {
         const paths = win.selectedPaths();
         if (paths.length === 0) return;
+        win.cutPaths = ({});
         clipboard.copy_to_clipboard(paths.join("\n"));
         win.toastMsg(paths.length === 1 ? "Copied" : ("Copied " + paths.length + " items"));
+    }
+
+    function cutSelection() {
+        const paths = win.selectedPaths();
+        if (paths.length === 0) return;
+        const nextCut = {};
+        for (let i = 0; i < paths.length; i++) nextCut[paths[i]] = true;
+        win.cutPaths = nextCut;
+        clipboard.cut_to_clipboard(paths.join("\n"));
+        win.toastMsg(paths.length === 1 ? "Cut" : ("Cut " + paths.length + " items"));
     }
 
     function copyPath() {
@@ -443,10 +508,16 @@ Window {
 
     function pasteClipboard() {
         if (clipboard.clipboard_count() === 0) { win.toastMsg("Clipboard is empty"); return; }
-        const err = clipboard.paste(win.curPath);
-        if (err) { win.toastMsg(err); return; }
-        win.toastMsg("Pasted");
-        win.refresh();
+        const paths = clipboard.clipboard_paths();
+        if (!paths) { win.toastMsg("Clipboard is empty"); return; }
+        if (clipboard.clipboard_is_cut()) {
+            win.cutPaths = ({});
+            clipboard.clear_clipboard();
+            tasks.move_paths(win.curPath, paths);
+        } else {
+            tasks.copy_paths(win.curPath, paths, "Pasted");
+        }
+        win.pollTasks();
     }
 
     function openIndex(i) {
@@ -566,35 +637,19 @@ Window {
         const op = win.pendingOp || {};
         if (op.type !== "delete") return;
         if (op.permanent) {
-            const err = fs.delete_permanent(op.paths.join("\n"));
-            if (err) { win.toastMsg(err); return; }
-            win.toastMsg(op.paths.length > 1 ? "Deleted " + op.paths.length + " items" : "Deleted");
-            win.refresh();
+            tasks.delete_paths(op.paths.join("\n"));
+            win.pollTasks();
             return;
         }
-        const res = trash.trash(op.paths.join("\n"));
-        if (res === "error:EXDEV") {
-            win.startDelete(op.paths, op.names, true);
-            win.toastMsg("This volume has no trash");
-            return;
-        }
-        if (res.indexOf("error:") === 0) { win.toastMsg(res.slice(6)); return; }
-        const names = res;
-        win.refresh();
-        win.trashCount = trash.trash_count();
-        win.toastUndo(names.split("\n").length > 1
-                      ? ("Trashed " + names.split("\n").length + " items") : "Trashed",
-                      names);
+        tasks.trash_paths(op.paths.join("\n"));
+        win.pollTasks();
     }
 
     // Undo the most recent trash operation.
     function undoTrash(names) {
         if (!names) return;
-        const err = trash.trash_restore(names);
-        if (err) { win.toastMsg(err); return; }
-        win.toastMsg("Restored");
-        win.refresh();
-        win.trashCount = trash.trash_count();
+        tasks.restore_trash(names);
+        win.pollTasks();
     }
 
     // ---- trash panel -------------------------------------------------------
@@ -604,12 +659,8 @@ Window {
     }
 
     function trashRestore(names) {
-        const err = trash.trash_restore(names.join("\n"));
-        if (err) { win.toastMsg(err); return; }
-        win.toastMsg("Restored");
-        win.refresh();
-        win.trashCount = trash.trash_count();
-        trashPanel.reload();
+        tasks.restore_trash(names.join("\n"));
+        win.pollTasks();
     }
 
     function trashDelete(names) {
@@ -621,11 +672,53 @@ Window {
     }
 
     function trashEmpty() {
-        const err = trash.trash_empty();
-        if (err) { win.toastMsg(err); return; }
-        win.toastMsg("Trash emptied");
-        win.trashCount = 0;
-        trashPanel.reload();
+        tasks.empty_trash();
+        win.pollTasks();
+    }
+
+    // ---- background task polling -------------------------------------------
+    function pollTasks() {
+        const raw = tasks.poll_json();
+        if (!raw) return;
+        let data;
+        try { data = JSON.parse(raw); } catch (e) { return; }
+        win.activeTasks = data.active || [];
+        const done = data.completed || [];
+        if (done.length > 0) {
+            let needRefresh = false;
+            let needTrashRefresh = false;
+            for (let i = 0; i < done.length; i++) {
+                const c = done[i];
+                needRefresh = true;
+                if (c.kind === "trash" || c.kind === "restore" || c.kind === "empty_trash" || c.kind === "delete") {
+                    needTrashRefresh = true;
+                }
+                if (c.cancelled) {
+                    win.toastMsg("Operation cancelled");
+                } else if (c.error && c.error.length > 0) {
+                    if (c.kind === "trash" && c.error === "error:EXDEV") {
+                        const sp = (c.sourcePaths || "").split("\n").filter(s => s.length > 0);
+                        const names = sp.map(p => Utils.baseName(p));
+                        if (sp.length > 0) {
+                            win.startDelete(sp, names, true);
+                        }
+                        win.toastMsg("This volume has no trash");
+                    } else {
+                        const msg = c.error.indexOf("error:") === 0 ? c.error.slice(6) : c.error;
+                        win.toastMsg(msg);
+                    }
+                } else if (c.kind === "trash" && c.undoNames && c.undoNames.length > 0) {
+                    win.toastUndo(c.toast || "Trashed", c.undoNames);
+                } else if (c.toast && c.toast.length > 0) {
+                    win.toastMsg(c.toast);
+                }
+            }
+            if (needRefresh) win.refresh();
+            if (needTrashRefresh) {
+                win.trashCount = trash.trash_count();
+                if (trashPanel.shown) trashPanel.reload();
+            }
+        }
     }
 
     // ---- context menu ------------------------------------------------------
@@ -643,6 +736,10 @@ Window {
             items.push({
                 label: n > 1 ? ("Copy " + n + " items") : "Copy",
                 glyph: "content_copy", act: "copy", key: "Ctrl+C"
+            });
+            items.push({
+                label: n > 1 ? ("Cut " + n + " items") : "Cut",
+                glyph: "content_cut", act: "cut", key: "Ctrl+X"
             });
             items.push({ label: "Copy Path", glyph: "content_copy", act: "copypath", key: "Ctrl+\u21e7C" });
             items.push({ label: "Preview", glyph: "visibility", act: "preview", key: "Space" });
@@ -675,6 +772,7 @@ Window {
         const i = win.index;
         if (act === "open") win.openIndex(i);
         else if (act === "copy") win.copySelection();
+        else if (act === "cut") win.cutSelection();
         else if (act === "copypath") win.copyPath();
         else if (act === "preview") win.openQuickLook();
         else if (act === "paste") win.pasteClipboard();
@@ -746,12 +844,28 @@ Window {
             }
         }
 
+        // Disable delegate entrance animations once the initial directory load finishes.
+        Timer {
+            id: entranceResetTimer
+            interval: 350
+            repeat: false
+            onTriggered: win.animateEntrance = false
+        }
+
         // Poll the Rust portal backend for pending FileChooser requests.
         Timer {
             interval: 200
             running: true
             repeat: true
             onTriggered: win.pollPortal()
+        }
+
+        // Poll background file operations (copy, move, delete, etc.).
+        Timer {
+            interval: 50
+            running: win.shown
+            repeat: true
+            onTriggered: win.pollTasks()
         }
 
         // Watch the current directory so the listing stays in sync with the
@@ -1031,6 +1145,9 @@ Window {
             } else if (ctrl && e.key === Qt.Key_C) {
                 if (shift) win.copyPath(); else win.copySelection();
                 e.accepted = true;
+            } else if (ctrl && e.key === Qt.Key_X) {
+                win.cutSelection();
+                e.accepted = true;
             } else if (ctrl && e.key === Qt.Key_V) {
                 win.pasteClipboard();
                 e.accepted = true;
@@ -1088,6 +1205,18 @@ Window {
             readText: function(path, max) { return preview.read_text(path, max); }
             onStepRequested: (delta) => win.quickLookStep(delta)
             onClosed: root.forceActiveFocus()
+        }
+
+        ProgressPopup {
+            id: progressPopup
+            anchors {
+                right: parent.right
+                bottom: status.top
+                rightMargin: 16
+                bottomMargin: 14
+            }
+            tasks: win.activeTasks
+            onCancelRequested: (taskId) => tasks.cancel(taskId)
         }
 
         Toast { id: toast }

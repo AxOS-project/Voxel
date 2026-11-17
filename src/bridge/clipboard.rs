@@ -20,6 +20,15 @@ pub struct Clipboard {
         }
     ),
 
+    // Cut paths (newline separated) to the clipboard so Paste moves them.
+    cut_to_clipboard: qt_method!(
+        fn cut_to_clipboard(&self, paths: QString) -> QString {
+            let list: Vec<PathBuf> = crate::util::path::parse_paths(&paths.to_string());
+            clipboard::cut_files(list);
+            QString::from("")
+        }
+    ),
+
     // Put arbitrary text (e.g. a path) on the clipboard as plain text.
     copy_text: qt_method!(
         fn copy_text(&self, text: QString) -> QString {
@@ -32,6 +41,33 @@ pub struct Clipboard {
     clipboard_count: qt_method!(
         fn clipboard_count(&self) -> i32 {
             clipboard::count() as i32
+        }
+    ),
+
+    // Whether the current clipboard holds cut (move) items.
+    clipboard_is_cut: qt_method!(
+        fn clipboard_is_cut(&self) -> bool {
+            clipboard::is_cut()
+        }
+    ),
+
+    // Newline-separated paths currently held in the in-app clipboard.
+    clipboard_paths: qt_method!(
+        fn clipboard_paths(&self) -> QString {
+            let paths = clipboard::get_paths();
+            let joined = paths
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("\n");
+            joined.into()
+        }
+    ),
+
+    // Clear the in-app clipboard.
+    clear_clipboard: qt_method!(
+        fn clear_clipboard(&self) {
+            clipboard::clear();
         }
     ),
 

@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod clipboard;
 pub mod fs_ops;
 pub mod portal;
+pub mod tasks;
 pub mod trash;
 pub mod util;
 
@@ -25,6 +26,7 @@ qrc!(pub register_resources,
         "components/FileList.qml",
         "components/MediaControls.qml",
         "components/PreviewPanel.qml",
+        "components/ProgressPopup.qml",
         "components/PromptDialog.qml",
         "components/QuickLook.qml",
         "components/SearchField.qml",

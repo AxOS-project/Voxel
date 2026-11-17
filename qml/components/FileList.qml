@@ -54,6 +54,13 @@ Item {
         return list.itemAtIndex(index);
     }
 
+    function restoreViewState(idx, cy) {
+        list.currentIndex = idx;
+        list.currentIndex = Qt.binding(function() { return gridContainer.currentIndex; });
+        const maxCy = Math.max(0, list.contentHeight - list.height);
+        list.contentY = Math.max(0, Math.min(cy, maxCy));
+    }
+
     ListView {
         id: list
         anchors.fill: parent
@@ -62,12 +69,20 @@ Item {
         currentIndex: gridContainer.currentIndex
         boundsBehavior: Flickable.StopAtBounds
         cacheBuffer: 2000
+        highlightFollowsCurrentItem: false
 
-        highlightMoveDuration: 150
-        highlightResizeDuration: 0
         highlight: Rectangle {
+            width: list.currentItem ? list.currentItem.width : list.width
+            height: list.currentItem ? list.currentItem.height : 36
+            y: list.currentItem ? list.currentItem.y : 0
+            visible: list.currentItem !== null
             color: Qt.rgba(1, 1, 1, 0.06)
             radius: Appearance.rounding.small
+
+            Behavior on y {
+                enabled: !win.suppressIndexScroll
+                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            }
 
             Rectangle {
                 anchors { left: parent.left; verticalCenter: parent.verticalCenter }

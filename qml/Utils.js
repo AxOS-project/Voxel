@@ -24,6 +24,14 @@ function isText(e) {
         || /^(README|LICENSE|COPYING|Makefile|Dockerfile|flake\.lock|Cargo\.lock|CMakeLists\.txt|\.gitignore|\.bashrc|\.profile)/i.test(e.name);
 }
 
+function fmtBytes(b) {
+    if (!b || b <= 0) return "0 B";
+    if (b < 1024) return b + " B";
+    if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + " MB";
+    return (b / 1073741824).toFixed(2) + " GB";
+}
+
 function fmtSize(e) {
     if (e.dir || e.link) return "--";
     const b = e.bytes;
