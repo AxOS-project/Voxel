@@ -51,7 +51,7 @@ Window {
     property string curPath: ""
     property string curParent: ""
     property var entries: []
-    property int index: 0
+    property int index: -1
     property string status: ""
     property bool showHidden: false
     property string filter: ""
@@ -164,8 +164,10 @@ Window {
         if (win.rowLayout) fileList.positionViewAtIndex(index, ListView.Contain)
         else fileGrid.positionViewAtIndex(index, GridView.Contain)
     }
-    onVisibleEntriesChanged: if (win.index >= win.visibleEntries.length)
-                                 win.index = Math.max(0, win.visibleEntries.length - 1)
+    onVisibleEntriesChanged: {
+        if (win.visibleEntries.length === 0) win.index = -1;
+        else if (win.index >= win.visibleEntries.length) win.index = win.visibleEntries.length - 1;
+    }
 
     // ---- navigation --------------------------------------------------------
     // Load a directory into the view without touching history.
@@ -180,17 +182,19 @@ Window {
         }
         win.animateEntrance = true;
         entranceResetTimer.restart();
+        win.suppressIndexScroll = true;
         win.listingRaw = raw;
         win.curPath = data.path;
         win.curParent = data.parent;
         win.entries = data.entries;
-        win.index = 0;
+        win.index = -1;
         win.selected = ({});
         win.anchor = -1;
         if (!keepFilter) { win.filter = ""; top.filter = ""; }
         win.status = (data.entries ? data.entries.length : 0) + " items";
-        fileList.restoreViewState(0, 0);
-        fileGrid.restoreViewState(0, 0);
+        fileList.restoreViewState(-1, 0);
+        fileGrid.restoreViewState(-1, 0);
+        win.suppressIndexScroll = false;
         return true;
     }
 
@@ -261,8 +265,13 @@ Window {
             for (let i = 0; i < list.length; i++) {
                 if (list[i].path === activePath) { win.index = i; break; }
             }
+            if (selectPath !== undefined && selectPath !== null && win.index >= 0) {
+                win.selectOnly(win.index);
+            }
+        } else if (activePath === null) {
+            win.index = -1;
         } else if (win.index >= win.visibleEntries.length) {
-            win.index = Math.max(0, win.visibleEntries.length - 1);
+            win.index = win.visibleEntries.length - 1;
         }
 
         const restoreScroll = function() {
@@ -300,13 +309,15 @@ Window {
             const rows = Math.max(1, Math.floor(fileGrid.gridHeight / fileGrid.cellHeight));
             items = cols * rows;
         }
-        if (win.selectedCount > 0) win.selected = ({});
-        win.index = Math.max(0, Math.min(n - 1, win.index + dir * items));
+        const base = win.index < 0 ? 0 : win.index;
+        win.index = Math.max(0, Math.min(n - 1, base + dir * items));
+        win.selectOnly(win.index);
     }
 
     // Space: toggle the current row's selection and step down.
     function toggleCurrent() {
         if (win.visibleEntries.length === 0) return;
+        if (win.index < 0) win.index = 0;
         win.toggleSelect(win.index);
         if (win.index < win.visibleEntries.length - 1) win.index += 1;
     }
@@ -361,14 +372,24 @@ Window {
 
     function move(delta) {
         const n = win.visibleEntries.length;
-        if (n === 0) { win.index = 0; return; }
-        if (win.selectedCount > 0) win.selected = ({});
-        win.index = ((win.index + delta) % n + n) % n;
+        if (n === 0) { win.index = -1; return; }
+        if (win.index < 0) {
+            win.index = delta >= 0 ? 0 : n - 1;
+        } else {
+            win.index = ((win.index + delta) % n + n) % n;
+        }
+        win.selectOnly(win.index);
     }
 
     // ---- selection ---------------------------------------------------------
     function isSelected(path) { return !!(win.selected && win.selected[path]); }
     function isCut(path) { return !!(win.cutPaths && win.cutPaths[path]); }
+
+    function clearSelection() {
+        win.selected = ({});
+        win.index = -1;
+        win.anchor = -1;
+    }
 
     function selectOnly(i) {
         const e = win.visibleEntries[i];
@@ -475,9 +496,8 @@ Window {
             win.index = i;
             win.selectRange(i);
         } else {
-            win.selected = ({});
-            win.anchor = i;
             win.index = i;
+            win.selectOnly(i);
         }
     }
 
@@ -979,7 +999,7 @@ Window {
             onEmptyContext: (x, y) => win.openMenu(-1, x, y)
             onRowClicked: (idx, modifiers) => win.handleRowClick(idx, modifiers)
             onDoubleClicked: (idx) => win.openIndex(idx)
-            onSelectionCleared: { if (win.selectedCount > 0) win.selected = ({}); }
+            onSelectionCleared: win.clearSelection()
 
             onMarqueeBegin: (x, y) => win.marqueeBegin(x, y)
             onMarqueeUpdate: (x, y) => win.marqueeUpdate(x, y)
@@ -1024,7 +1044,7 @@ Window {
             onEmptyContext: (x, y) => win.openMenu(-1, x, y)
             onRowClicked: (idx, modifiers) => win.handleRowClick(idx, modifiers)
             onDoubleClicked: (idx) => win.openIndex(idx)
-            onSelectionCleared: { if (win.selectedCount > 0) win.selected = ({}); }
+            onSelectionCleared: win.clearSelection()
 
             onMarqueeBegin: (x, y) => win.marqueeBegin(x, y)
             onMarqueeUpdate: (x, y) => win.marqueeUpdate(x, y)
@@ -1079,7 +1099,7 @@ Window {
         Keys.onEscapePressed: (e) => {
             if (menu.shown) { menu.shown = false; e.accepted = true; }
             else if (win.filter.length > 0) { win.filter = ""; top.filter = ""; e.accepted = true; }
-            else if (win.selectedCount > 0) { win.selected = ({}); e.accepted = true; }
+            else if (win.selectedCount > 0 || win.index >= 0) { win.clearSelection(); e.accepted = true; }
             else if (!win.overlayOpen) { if (win.picker) { win.pickerCancel(); } e.accepted = true; }
         }
         Keys.onPressed: (e) => {
@@ -1130,9 +1150,14 @@ Window {
                 win.deleteCurrent(!!shift);
                 e.accepted = true;
             } else if (e.key === Qt.Key_Home) {
-                win.index = 0; e.accepted = true;
+                if (win.visibleEntries.length > 0) { win.index = 0; win.selectOnly(0); }
+                e.accepted = true;
             } else if (e.key === Qt.Key_End) {
-                win.index = Math.max(0, win.visibleEntries.length - 1); e.accepted = true;
+                if (win.visibleEntries.length > 0) {
+                    win.index = win.visibleEntries.length - 1;
+                    win.selectOnly(win.index);
+                }
+                e.accepted = true;
             } else if (ctrl && e.key === Qt.Key_H) {
                 win.showHidden = !win.showHidden;
                 e.accepted = true;

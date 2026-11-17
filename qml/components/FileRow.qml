@@ -22,16 +22,26 @@ Rectangle {
     width: ListView.view.width
     height: 36
     radius: Appearance.rounding.small
-    color: row.dropActive ? Qt.rgba(0.84, 0.84, 0.86, 0.18)
+    color: row.dropActive ? Qt.rgba(1, 1, 1, 0.18)
          : row.selected ? Qt.rgba(1, 1, 1, 0.11)
-         : row.hovered ? Appearance.colors.colLayer0Hover
-         : "transparent"
+         : row.hovered ? Qt.rgba(1, 1, 1, 0.05)
+         : Qt.rgba(1, 1, 1, 0)
     border.width: row.dropActive ? 1 : 0
     border.color: Appearance.colors.colPrimary
     Behavior on color {
         ColorAnimation {
             duration: 100
         }
+    }
+
+    Rectangle {
+        visible: row.selected
+        anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+        anchors.leftMargin: 2
+        width: 3
+        height: Math.max(0, parent.height - 14)
+        radius: 1.5
+        color: Appearance.colors.colPrimary
     }
 
     opacity: win.animateEntrance ? 0 : 1

@@ -20,11 +20,11 @@ Rectangle {
     width: GridView.view.cellWidth
     height: GridView.view.cellHeight
     radius: Appearance.rounding.small
-    color: item.dropActive ? Qt.rgba(0.84, 0.84, 0.86, 0.18)
+    color: item.dropActive ? Qt.rgba(1, 1, 1, 0.18)
          : item.selected ? Qt.rgba(1, 1, 1, 0.11)
-         : item.hovered ? Appearance.colors.colLayer0Hover
-         : "transparent"
-    border.width: item.dropActive || item.selected ? 1 : 0
+         : item.hovered ? Qt.rgba(1, 1, 1, 0.05)
+         : Qt.rgba(1, 1, 1, 0)
+    border.width: item.dropActive ? 1 : 0
     border.color: Appearance.colors.colPrimary
     Behavior on color { ColorAnimation { duration: 100 } }
 

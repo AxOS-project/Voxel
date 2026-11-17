@@ -9,7 +9,7 @@ Item {
     id: gridContainer
 
     property var model: []
-    property int currentIndex: 0
+    property int currentIndex: -1
     property int hoverIndex: -1
     property var selected: ({})
     property int anchorIndex: -1
@@ -55,8 +55,6 @@ Item {
     }
 
     function restoreViewState(idx, cy) {
-        list.currentIndex = idx;
-        list.currentIndex = Qt.binding(function() { return gridContainer.currentIndex; });
         const maxCy = Math.max(0, list.contentHeight - list.height);
         list.contentY = Math.max(0, Math.min(cy, maxCy));
     }
@@ -66,33 +64,9 @@ Item {
         anchors.fill: parent
         clip: true
         model: gridContainer.model
-        currentIndex: gridContainer.currentIndex
         boundsBehavior: Flickable.StopAtBounds
         cacheBuffer: 2000
         highlightFollowsCurrentItem: false
-
-        highlight: Rectangle {
-            width: list.currentItem ? list.currentItem.width : list.width
-            height: list.currentItem ? list.currentItem.height : 36
-            y: list.currentItem ? list.currentItem.y : 0
-            visible: list.currentItem !== null
-            color: Qt.rgba(1, 1, 1, 0.06)
-            radius: Appearance.rounding.small
-
-            Behavior on y {
-                enabled: !win.suppressIndexScroll
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-            }
-
-            Rectangle {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                anchors.leftMargin: 2
-                width: 3
-                height: Math.max(0, parent.height - 14)
-                radius: 1.5
-                color: Appearance.colors.colPrimary 
-            }
-        }
 
         delegate: FileRow {
             selected: win.isSelected(modelData.path)
@@ -127,6 +101,7 @@ Item {
         property bool banding: false
         property bool moved: false
         property bool armed: false
+        property bool doubleClickedFlag: false
         property var grab: null
         property url pixmap: ""
 
@@ -170,23 +145,26 @@ Item {
             pressY = mouse.y;
             banding = false;
             moved = false;
+            doubleClickedFlag = false;
             pressIndex = indexAt(mouse.x, mouse.y);
             gridContainer.hoverIndex = pressIndex;
             armed = pressIndex >= 0 && selectedAt(pressIndex);
-            if (armed) {
-                const item = list.itemAtIndex(pressIndex);
-                if (item)
-                    item.grabToImage(function(result) {
-                        listMouse.grab = result;
-                        listMouse.pixmap = result.url;
-                    });
-            }
         }
 
         onPositionChanged: mouse => {
             gridContainer.hoverIndex = indexAt(mouse.x, mouse.y);
             if (!pressed || (mouse.buttons & Qt.RightButton)) return;
-            if (!moved && (Math.abs(mouse.x - pressX) > 6 || Math.abs(mouse.y - pressY) > 6)) moved = true;
+            if (!moved && (Math.abs(mouse.x - pressX) > 6 || Math.abs(mouse.y - pressY) > 6)) {
+                moved = true;
+                if (listMouse.armed) {
+                    const item = list.itemAtIndex(pressIndex);
+                    if (item)
+                        item.grabToImage(function(result) {
+                            listMouse.grab = result;
+                            listMouse.pixmap = result.url;
+                        });
+                }
+            }
             if (listMouse.armed || !moved) return;
             if (!banding) {
                 banding = true;
@@ -197,6 +175,14 @@ Item {
 
         onReleased: mouse => {
             if (mouse.button === Qt.RightButton) return;
+            if (doubleClickedFlag) {
+                doubleClickedFlag = false;
+                banding = false;
+                moved = false;
+                armed = false;
+                pressIndex = -1;
+                return;
+            }
             if (banding) {
                 gridContainer.marqueeEnd();
                 const rx = Math.min(gridContainer.marqueeX0, gridContainer.marqueeX1);
@@ -219,6 +205,7 @@ Item {
 
         onCanceled: {
             if (banding) gridContainer.marqueeEnd();
+            doubleClickedFlag = false;
             banding = false;
             moved = false;
             armed = false;
@@ -227,7 +214,12 @@ Item {
 
         onDoubleClicked: mouse => {
             const i = indexAt(mouse.x, mouse.y);
-            if (i >= 0) gridContainer.doubleClicked(i);
+            doubleClickedFlag = true;
+            banding = false;
+            moved = false;
+            armed = false;
+            pressIndex = -1;
+            if (i >= 0) Qt.callLater(function() { gridContainer.doubleClicked(i); });
         }
 
         WheelHandler {
