@@ -18,6 +18,9 @@ pub struct Pending {
     pub handle: String,
     pub directory: bool,
     pub multiple: bool,
+    pub save: bool,
+    pub current_name: String,
+    pub current_folder: String,
 }
 
 /// State shared between the D-Bus worker thread and the GUI thread.

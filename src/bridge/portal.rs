@@ -14,10 +14,13 @@ pub struct Portal {
         fn poll_portal(&self) -> QString {
             match portal::poll() {
                 Some(p) => format!(
-                    "{{\"handle\":\"{}\",\"directory\":{},\"multiple\":{}}}",
+                    "{{\"handle\":\"{}\",\"directory\":{},\"multiple\":{},\"save\":{},\"current_name\":\"{}\",\"current_folder\":\"{}\"}}",
                     esc(&p.handle),
                     p.directory,
-                    p.multiple
+                    p.multiple,
+                    p.save,
+                    esc(&p.current_name),
+                    esc(&p.current_folder),
                 )
                 .into(),
                 None => QString::from(""),

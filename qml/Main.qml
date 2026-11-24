@@ -16,7 +16,7 @@ Window {
     minimumWidth: 520
     minimumHeight: 360
     visible: shown
-    title: win.picker ? "Choose" : "Files"
+    title: win.picker ? (win.picker.save ? "Save" : "Choose") : "Files"
     color: Appearance.colors.colLayer0
 
     // Hidden when started as a portal backend until a request arrives.
@@ -210,9 +210,15 @@ Window {
         return out;
     }
 
-    onIndexChanged: if (index >= 0 && !win.suppressIndexScroll) {
-        if (win.rowLayout) fileList.positionViewAtIndex(index, ListView.Contain)
-        else fileGrid.positionViewAtIndex(index, GridView.Contain)
+    onIndexChanged: {
+        if (index >= 0 && !win.suppressIndexScroll) {
+            if (win.rowLayout) fileList.positionViewAtIndex(index, ListView.Contain)
+            else fileGrid.positionViewAtIndex(index, GridView.Contain)
+        }
+        if (win.picker && win.picker.save && index >= 0 && index < win.visibleEntries.length) {
+            const e = win.visibleEntries[index];
+            if (e && !e.dir) status.pickerFileName = e.name;
+        }
     }
     onVisibleEntriesChanged: {
         if (win.visibleEntries.length === 0) win.index = -1;
@@ -594,12 +600,20 @@ Window {
 
     function openIndex(i) {
         const list = win.visibleEntries;
-        if (i < 0 || i >= list.length) return;
+        if (i < 0 || i >= list.length) {
+            if (win.picker && win.picker.save) win.pickerAccept();
+            return;
+        }
         const e = list[i];
         if (e.dir) { win.navigate(e.path); return; }
         if (win.picker) {
             win.index = i;
-            if (!win.picker.directory) win.pickerAccept();
+            if (win.picker.save) {
+                status.pickerFileName = e.name;
+                win.pickerAccept();
+            } else if (!win.picker.directory) {
+                win.pickerAccept();
+            }
             return;
         }
         const err = fs.open(e.path);
@@ -868,11 +882,17 @@ Window {
         let req;
         try { req = JSON.parse(raw); } catch (e) { return; }
         win.picker = req;
+        status.pickerFileName = req.save ? (req.current_name || "") : "";
         win.shown = true;
         win.raise();
         win.requestActivate();
-        const start = (VoxelInitialPath && VoxelInitialPath !== "") ? VoxelInitialPath : fs.home();
-        win.navigate(start);
+        const fallback = (VoxelInitialPath && VoxelInitialPath !== "") ? VoxelInitialPath : fs.home();
+        if (req.current_folder && req.current_folder !== "") {
+            if (!win.load(req.current_folder, false)) win.navigate(fallback);
+        } else {
+            win.navigate(fallback);
+        }
+        if (req.save) status.focusSaveInput();
     }
 
     function pickerAccept() {
@@ -880,7 +900,15 @@ Window {
         const list = win.visibleEntries;
         const e = list[win.index];
         const paths = [];
-        if (win.picker.directory) {
+        if (win.picker.save) {
+            const name = status.pickerFileName.trim();
+            if (!name || name.indexOf("/") !== -1) {
+                status.focusSaveInput();
+                return;
+            }
+            const base = win.curPath === "/" ? "" : win.curPath;
+            paths.push(base + "/" + name);
+        } else if (win.picker.directory) {
             paths.push((e && e.dir) ? e.path : win.curPath);
         } else {
             if (e && !e.dir) paths.push(e.path);
@@ -894,6 +922,7 @@ Window {
     function pickerAnswer(code, paths) {
         if (win.picker && win.picker.handle) portal.portal_reply(win.picker.handle, code, paths.join("\n"));
         win.picker = null;
+        status.pickerFileName = "";
         if (VoxelPortalMode) win.shown = false;
     }
 
@@ -1142,6 +1171,7 @@ Window {
             statusText: win.status
             pickerMode: win.picker !== null
             pickerDirectory: win.picker && win.picker.directory
+            pickerSave: win.picker && win.picker.save
 
             onPickerCancel: win.pickerCancel()
             onPickerAccept: win.pickerAccept()
