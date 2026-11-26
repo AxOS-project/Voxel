@@ -1,11 +1,13 @@
 import QtQuick
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
-import "../Utils.js" as Utils
 
-Item {
-    id: status
-    height: status.pickerSave ? 40 : 32
+// Bottom bar showing item counts, status text, and Save/Choose buttons when running as a file picker.
+Rectangle {
+    id: statusBar
+
+    height: statusBar.pickerSave ? 40 : 32
+    color: Appearance.colors.colLayer2
 
     property int selectedCount: 0
     property int visibleCount: 0
@@ -24,33 +26,45 @@ Item {
         saveInput.selectAll();
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Appearance.colors.colLayer2
-    }
+    // Left: selection count or visible/total count
     Text {
-        anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
-        text: status.selectedCount > 0
-              ? (status.selectedCount + " selected")
-              : (status.visibleCount + " / " + status.totalCount)
-        color: Appearance.colors.colOnLayer0
-        font.pixelSize: 11
-    }
-    Text {
-        anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
-        visible: !status.pickerMode
-        text: status.statusText
+        anchors {
+            left: parent.left
+            leftMargin: 14
+            verticalCenter: parent.verticalCenter
+        }
+        text: statusBar.selectedCount > 0
+            ? (statusBar.selectedCount + " selected")
+            : (statusBar.visibleCount + " / " + statusBar.totalCount)
         color: Appearance.colors.colOnLayer0
         font.pixelSize: 11
     }
 
+    // Right (normal mode): total item count or error message
+    Text {
+        anchors {
+            right: parent.right
+            rightMargin: 14
+            verticalCenter: parent.verticalCenter
+        }
+        visible: !statusBar.pickerMode
+        text: statusBar.statusText
+        color: Appearance.colors.colOnLayer0
+        font.pixelSize: 11
+    }
+
+    // Right (file picker mode): filename box + Cancel / Choose buttons
     Row {
-        anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
+        anchors {
+            right: parent.right
+            rightMargin: 14
+            verticalCenter: parent.verticalCenter
+        }
         spacing: 8
-        visible: status.pickerMode
+        visible: statusBar.pickerMode
 
         Rectangle {
-            visible: status.pickerSave
+            visible: statusBar.pickerSave
             width: 240
             height: 28
             radius: Appearance.rounding.full
@@ -60,7 +74,11 @@ Item {
 
             TextInput {
                 id: saveInput
-                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+                anchors {
+                    fill: parent
+                    leftMargin: 12
+                    rightMargin: 12
+                }
                 verticalAlignment: TextInput.AlignVCenter
                 color: Appearance.colors.colOnLayer0
                 font.pixelSize: 12
@@ -68,13 +86,16 @@ Item {
                 selectedTextColor: Appearance.colors.colLayer0
                 clip: true
 
-                Keys.onReturnPressed: (e) => { status.pickerAccept(); e.accepted = true; }
-                Keys.onEnterPressed: (e) => { status.pickerAccept(); e.accepted = true; }
-                Keys.onEscapePressed: (e) => { status.pickerCancel(); e.accepted = true; }
+                Keys.onReturnPressed: (event) => { statusBar.pickerAccept(); event.accepted = true; }
+                Keys.onEnterPressed: (event) => { statusBar.pickerAccept(); event.accepted = true; }
+                Keys.onEscapePressed: (event) => { statusBar.pickerCancel(); event.accepted = true; }
             }
 
             Text {
-                anchors { left: saveInput.left; verticalCenter: parent.verticalCenter }
+                anchors {
+                    left: saveInput.left
+                    verticalCenter: parent.verticalCenter
+                }
                 visible: saveInput.text.length === 0
                 text: "File name"
                 color: Appearance.colors.colSubtext
@@ -82,13 +103,19 @@ Item {
             }
         }
 
-        ActionButton { label: "Cancel"; onActivated: status.pickerCancel() }
         ActionButton {
-            label: status.pickerSave ? "Save"
-                 : status.pickerDirectory ? "Choose folder"
-                 : "Choose file"
+            label: "Cancel"
+            onActivated: statusBar.pickerCancel()
+        }
+
+        ActionButton {
+            label: {
+                if (statusBar.pickerSave) return "Save";
+                if (statusBar.pickerDirectory) return "Choose folder";
+                return "Choose file";
+            }
             primary: true
-            onActivated: status.pickerAccept()
+            onActivated: statusBar.pickerAccept()
         }
     }
 }

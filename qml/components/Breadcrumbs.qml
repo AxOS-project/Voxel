@@ -4,14 +4,15 @@ import QtQuick
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
 
-// Horizontally scrolling breadcrumb bar. `model` is a list of {name, path}.
+// Horizontally scrolling path bar showing clickable folder parts (e.g. / > home > user).
 Flickable {
-    id: crumbs
+    id: breadcrumbs
+
     property var model: []
     property string currentPath: ""
 
     signal navigate(string path)
-    signal dropRequested(string path, var uris, bool internal)
+    signal dropRequested(string path, var uris, bool isInternal)
 
     height: 28
     contentWidth: crumbRow.width
@@ -19,69 +20,78 @@ Flickable {
     flickableDirection: Flickable.HorizontalFlick
     boundsBehavior: Flickable.StopAtBounds
 
-    function toEnd() { contentX = Math.max(0, contentWidth - width); }
+    function scrollToEnd() {
+        contentX = Math.max(0, contentWidth - width);
+    }
 
-    onContentWidthChanged: toEnd()
-    onWidthChanged: toEnd()
-    onCurrentPathChanged: toEnd()
+    onContentWidthChanged: scrollToEnd()
+    onWidthChanged: scrollToEnd()
+    onCurrentPathChanged: scrollToEnd()
 
     Row {
         id: crumbRow
-        height: crumbs.height
-        spacing: 0
+        height: breadcrumbs.height
 
         Repeater {
-            model: crumbs.model
+            model: breadcrumbs.model
 
             delegate: Item {
-                id: crumb
+                id: crumbItem
                 required property var modelData
                 required property int index
 
-                width: crumbBtn.width + crumbSep.width
-                height: crumbs.height
+                width: crumbButton.width + separatorIcon.width
+                height: breadcrumbs.height
 
                 Rectangle {
-                    id: crumbBtn
+                    id: crumbButton
                     anchors.verticalCenter: parent.verticalCenter
-                    width: crumbText.implicitWidth + 16
+                    width: crumbLabel.implicitWidth + 16
                     height: 24
                     radius: 12
-                    color: (crumbMa.containsMouse || crumbDrop.containsDrag) ? Appearance.colors.colLayer0Hover : "transparent"
-                    Behavior on color { ColorAnimation { duration: 90 } }
+                    color: (mouseArea.containsMouse || dropArea.containsDrag)
+                        ? Appearance.colors.colLayer0Hover
+                        : "transparent"
 
                     Text {
-                        id: crumbText
+                        id: crumbLabel
                         anchors.centerIn: parent
-                        text: crumb.modelData.name
-                        color: crumb.modelData.path === crumbs.currentPath ? Appearance.colors.colOnLayer0 : Appearance.colors.colOnLayer0
+                        text: crumbItem.modelData.name
+                        color: Appearance.colors.colOnLayer0
                         font.pixelSize: 12
                     }
+
                     MouseArea {
-                        id: crumbMa
+                        id: mouseArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: crumbs.navigate(crumb.modelData.path)
+                        onClicked: breadcrumbs.navigate(crumbItem.modelData.path)
                     }
+
                     DropArea {
-                        id: crumbDrop
+                        id: dropArea
                         anchors.fill: parent
-                        onDropped: drop => {
-                            if (!drop.hasUrls)
-                                return;
+                        onDropped: (drop) => {
+                            if (!drop.hasUrls) return;
                             const uris = [];
-                            for (let i = 0; i < drop.urls.length; i++) uris.push(String(drop.urls[i]));
+                            for (let i = 0; i < drop.urls.length; i++) {
+                                uris.push(String(drop.urls[i]));
+                            }
                             drop.accept(Qt.MoveAction);
-                            crumbs.dropRequested(crumb.modelData.path, uris, drop.formats.indexOf("application/x-voxel-internal") >= 0);
+                            const isInternal = drop.formats.indexOf("application/x-voxel-internal") >= 0;
+                            breadcrumbs.dropRequested(crumbItem.modelData.path, uris, isInternal);
                         }
                     }
                 }
 
                 MaterialSymbol {
-                    id: crumbSep
-                    anchors { left: crumbBtn.right; verticalCenter: parent.verticalCenter }
-                    visible: crumb.index < crumbs.model.length - 1
+                    id: separatorIcon
+                    anchors {
+                        left: crumbButton.right
+                        verticalCenter: parent.verticalCenter
+                    }
+                    visible: crumbItem.index < breadcrumbs.model.length - 1
                     width: visible ? 14 : 0
                     text: "chevron_right"
                     color: Appearance.colors.colOnLayer0

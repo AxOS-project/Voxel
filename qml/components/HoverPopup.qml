@@ -1,24 +1,52 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
 import "../Utils.js" as Utils
 
-// Floating metadata tooltip shown when hovering over a file or folder item.
+// Floating tooltip that appears when hovering over a file or folder.
 Rectangle {
-    id: hp
+    id: popup
 
     property bool shown: false
     property var entry: null
     property var info: null
 
+    readonly property var detailRows: {
+        if (!popup.entry) return [];
+
+        let sizeOrCount = "--";
+        if (popup.entry.dir) {
+            const count = (popup.info && popup.info.count >= 0) ? popup.info.count : 0;
+            sizeOrCount = count + (count === 1 ? " item" : " items");
+        } else {
+            const bytes = (popup.info && popup.info.bytes !== undefined) ? popup.info.bytes : (popup.entry.bytes || 0);
+            sizeOrCount = Utils.fmtBytes(bytes);
+        }
+
+        const created = (popup.info && popup.info.created) ? Utils.fmtTime(popup.info.created) : "--";
+        const modified = (popup.info && popup.info.modified)
+            ? Utils.fmtTime(popup.info.modified)
+            : Utils.fmtTime(popup.entry.mtime);
+        const owner = (popup.info && popup.info.owner) ? popup.info.owner : "--";
+
+        return [
+            { label: popup.entry.dir ? "Content" : "Size", value: sizeOrCount },
+            { label: "Created at", value: created },
+            { label: "Modified at", value: modified },
+            { label: "Owner", value: owner }
+        ];
+    }
+
     width: 248
-    height: col.implicitHeight + 20
+    height: contentColumn.implicitHeight + 20
     radius: Appearance.rounding.normal
     color: Appearance.colors.colLayer2
     border.width: 1
     border.color: Appearance.colors.colOutlineVariant
-    opacity: shown && entry !== null ? 1 : 0
-    scale: shown && entry !== null ? 1 : 0.97
+    opacity: (popup.shown && popup.entry !== null) ? 1 : 0
+    scale: (popup.shown && popup.entry !== null) ? 1 : 0.97
     visible: opacity > 0.01
     z: 115
 
@@ -26,30 +54,34 @@ Rectangle {
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
     Column {
-        id: col
+        id: contentColumn
         anchors {
-            left: parent.left; right: parent.right; top: parent.top
-            leftMargin: 12; rightMargin: 12; topMargin: 10
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            leftMargin: 12
+            rightMargin: 12
+            topMargin: 10
         }
         spacing: 6
 
-        // Item title
+        // Header: icon + file/folder name
         Row {
             width: parent.width
             spacing: 8
 
             MaterialSymbol {
-                id: hIcon
+                id: headerIcon
                 anchors.verticalCenter: parent.verticalCenter
-                text: (hp.entry && hp.entry.dir) ? "folder" : "description"
+                text: (popup.entry && popup.entry.dir) ? "folder" : "description"
                 color: Appearance.colors.colPrimary
                 iconSize: 15
             }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - hIcon.width - 8
-                text: hp.entry ? hp.entry.name : ""
+                width: parent.width - headerIcon.width - 8
+                text: popup.entry ? popup.entry.name : ""
                 color: Appearance.colors.colOnLayer0
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
@@ -63,97 +95,38 @@ Rectangle {
             color: Appearance.colors.colOutlineVariant
         }
 
-        // Size (files) or Content num (folder)
-        Item {
-            width: parent.width
-            height: 16
+        // Metadata key-value rows
+        Repeater {
+            model: popup.detailRows
 
-            Text {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                text: (hp.entry && hp.entry.dir) ? "Content" : "Size"
-                color: Appearance.colors.colSubtext
-                font.pixelSize: 11
-            }
+            delegate: Item {
+                id: detailRow
+                required property var modelData
+                width: contentColumn.width
+                height: 16
 
-            Text {
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                text: {
-                    if (!hp.entry) return "--";
-                    if (hp.entry.dir) {
-                        const c = (hp.info && hp.info.count !== undefined && hp.info.count >= 0) ? hp.info.count : 0;
-                        return c + (c === 1 ? " item" : " items");
+                Text {
+                    anchors {
+                        left: parent.left
+                        verticalCenter: parent.verticalCenter
                     }
-                    const b = (hp.info && hp.info.bytes !== undefined) ? hp.info.bytes : (hp.entry.bytes || 0);
-                    return Utils.fmtBytes(b);
+                    text: detailRow.modelData.label
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: 11
                 }
-                color: Appearance.colors.colOnLayer0
-                font.pixelSize: 11
-                font.weight: Font.Medium
-            }
-        }
 
-        // Created at
-        Item {
-            width: parent.width
-            height: 16
-
-            Text {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                text: "Created at"
-                color: Appearance.colors.colSubtext
-                font.pixelSize: 11
-            }
-
-            Text {
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                text: (hp.info && hp.info.created) ? Utils.fmtTime(hp.info.created) : "--"
-                color: Appearance.colors.colOnLayer0
-                font.pixelSize: 11
-            }
-        }
-
-        // Modified at
-        Item {
-            width: parent.width
-            height: 16
-
-            Text {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                text: "Modified at"
-                color: Appearance.colors.colSubtext
-                font.pixelSize: 11
-            }
-
-            Text {
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                text: (hp.info && hp.info.modified)
-                      ? Utils.fmtTime(hp.info.modified)
-                      : (hp.entry ? Utils.fmtTime(hp.entry.mtime) : "--")
-                color: Appearance.colors.colOnLayer0
-                font.pixelSize: 11
-            }
-        }
-
-        // Owner
-        Item {
-            width: parent.width
-            height: 16
-
-            Text {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-                text: "Owner"
-                color: Appearance.colors.colSubtext
-                font.pixelSize: 11
-            }
-
-            Text {
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                width: parent.width - 70
-                horizontalAlignment: Text.AlignRight
-                text: (hp.info && hp.info.owner) ? hp.info.owner : "--"
-                color: Appearance.colors.colOnLayer0
-                font.pixelSize: 11
-                elide: Text.ElideRight
+                Text {
+                    anchors {
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                    }
+                    width: parent.width - 75
+                    horizontalAlignment: Text.AlignRight
+                    text: detailRow.modelData.value
+                    color: Appearance.colors.colOnLayer0
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
             }
         }
     }

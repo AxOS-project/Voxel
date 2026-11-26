@@ -2,107 +2,120 @@ import QtQuick
 import QtMultimedia
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
+import Voxel
 import "../Utils.js" as Utils
 
-// Full-window preview overlay with image zoom/pan, video and audio playback
-// and a text/code viewer. Navigation is delegated to the host via
-// `stepRequested`.
+// Full-window preview opened with the Space bar. Supports image zoom/pan,
+// video playback, audio playback, and text/code viewing.
 Item {
-    id: ql
+    id: quickLook
+
     property bool shown: false
     property var entry: null
     property int index: 0
     property int total: 0
-    // Injected backend functions: (path) -> uri, (path, max) -> text.
-    property var fileUri: null
-    property var readText: null
+    property var xdgDirs: ({})
 
-    property string source: ""
-    property string text: ""
+    Preview { id: preview }
+
+    property string mediaSource: ""
+    property string textContent: ""
     property real zoom: 1
     property real panX: 0
     property real panY: 0
 
-    readonly property bool image: Utils.isImage(entry)
-    readonly property bool video: Utils.isVideo(entry)
-    readonly property bool audio: Utils.isAudio(entry)
-    readonly property bool textMode: Utils.isText(entry) && text !== ""
-    readonly property bool fallback: entry !== null && !image && !video && !audio && !textMode
+    readonly property bool isImage: Utils.isImage(quickLook.entry)
+    readonly property bool isVideo: Utils.isVideo(quickLook.entry)
+    readonly property bool isAudio: Utils.isAudio(quickLook.entry)
+    readonly property bool isText: Utils.isText(quickLook.entry) && quickLook.textContent !== ""
+    readonly property bool isFallback: quickLook.entry !== null
+        && !quickLook.isImage && !quickLook.isVideo && !quickLook.isAudio && !quickLook.isText
 
     signal stepRequested(int delta)
     signal closed()
 
-    function open(e) {
-        qlVideo.stop();
-        qlAudio.stop();
-        ql.entry = e;
-        ql.source = "";
-        ql.text = "";
-        ql.zoom = 1;
-        ql.panX = 0;
-        ql.panY = 0;
-        if (e && !e.dir) {
-            if (Utils.isImage(e) || Utils.isVideo(e) || Utils.isAudio(e)) {
-                ql.source = ql.fileUri ? ql.fileUri(e.path) : "";
-                if (Utils.isVideo(e)) qlVideo.play();
-            } else if (Utils.isText(e)) {
-                ql.text = ql.readText ? ql.readText(e.path, 300000) : "";
+    function open(targetEntry) {
+        videoPlayer.stop();
+        audioPlayer.stop();
+
+        quickLook.entry = targetEntry;
+        quickLook.mediaSource = "";
+        quickLook.textContent = "";
+        quickLook.zoom = 1;
+        quickLook.panX = 0;
+        quickLook.panY = 0;
+
+        if (targetEntry && !targetEntry.dir) {
+            if (Utils.isImage(targetEntry) || Utils.isVideo(targetEntry) || Utils.isAudio(targetEntry)) {
+                quickLook.mediaSource = Utils.fileUri(targetEntry.path);
+                if (Utils.isVideo(targetEntry)) videoPlayer.play();
+            } else if (Utils.isText(targetEntry)) {
+                quickLook.textContent = preview.read_text(targetEntry.path, 300000);
             }
         }
-        ql.shown = true;
-        ql.forceActiveFocus();
+
+        quickLook.shown = true;
+        quickLook.forceActiveFocus();
     }
+
     function close() {
-        qlVideo.stop();
-        qlAudio.stop();
-        ql.shown = false;
-        ql.closed();
+        videoPlayer.stop();
+        audioPlayer.stop();
+        quickLook.shown = false;
+        quickLook.closed();
     }
-    function step(d) { ql.stepRequested(d); }
 
     anchors.fill: parent
     z: 108
-    focus: shown
-    opacity: shown ? 1 : 0
+    focus: quickLook.shown
+    opacity: quickLook.shown ? 1 : 0
     visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: 140 } }
 
-    Keys.onEscapePressed: (e) => { ql.close(); e.accepted = true; }
-    Keys.onReturnPressed: (e) => { ql.close(); e.accepted = true; }
-    Keys.onEnterPressed: (e) => { ql.close(); e.accepted = true; }
-    Keys.onLeftPressed: (e) => { ql.step(-1); e.accepted = true; }
-    Keys.onRightPressed: (e) => { ql.step(1); e.accepted = true; }
-    Keys.onUpPressed: (e) => { ql.step(-1); e.accepted = true; }
-    Keys.onDownPressed: (e) => { ql.step(1); e.accepted = true; }
-    Keys.onSpacePressed: (e) => { ql.close(); e.accepted = true; }
-    Keys.onPressed: (e) => {
-        if (e.key === Qt.Key_Plus || e.key === Qt.Key_Equal) {
-            ql.zoom = Math.min(8, ql.zoom * 1.25); e.accepted = true;
-        } else if (e.key === Qt.Key_Minus) {
-            ql.zoom = Math.max(0.2, ql.zoom / 1.25); e.accepted = true;
-        } else if (e.key === Qt.Key_0) {
-            ql.zoom = 1; ql.panX = 0; ql.panY = 0; e.accepted = true;
+    // Keyboard controls inside QuickLook
+    Keys.onEscapePressed: (event) => { quickLook.close(); event.accepted = true; }
+    Keys.onReturnPressed: (event) => { quickLook.close(); event.accepted = true; }
+    Keys.onEnterPressed: (event) => { quickLook.close(); event.accepted = true; }
+    Keys.onSpacePressed: (event) => { quickLook.close(); event.accepted = true; }
+    Keys.onLeftPressed: (event) => { quickLook.stepRequested(-1); event.accepted = true; }
+    Keys.onRightPressed: (event) => { quickLook.stepRequested(1); event.accepted = true; }
+    Keys.onUpPressed: (event) => { quickLook.stepRequested(-1); event.accepted = true; }
+    Keys.onDownPressed: (event) => { quickLook.stepRequested(1); event.accepted = true; }
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
+            quickLook.zoom = Math.min(8, quickLook.zoom * 1.25);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Minus) {
+            quickLook.zoom = Math.max(0.2, quickLook.zoom / 1.25);
+            event.accepted = true;
+        } else if (event.key === Qt.Key_0) {
+            quickLook.zoom = 1;
+            quickLook.panX = 0;
+            quickLook.panY = 0;
+            event.accepted = true;
         }
     }
 
+    // Dark backdrop
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0, 0, 0, 0.9)
-        MouseArea { anchors.fill: parent; onClicked: ql.close() }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: quickLook.close()
+        }
     }
 
-    // image: zoom + pan
+    // ---- 1. Image Viewer (with Zoom and Pan) -------------------------------
     Item {
-        id: imageStage
         anchors.fill: parent
         anchors.margins: 48
         anchors.bottomMargin: 44
-        visible: ql.image
+        visible: quickLook.isImage
         clip: true
 
         Image {
-            id: qlImage
-            source: ql.image ? ql.source : ""
+            source: quickLook.isImage ? quickLook.mediaSource : ""
             asynchronous: true
             cache: false
             sourceSize.width: 4096
@@ -110,113 +123,85 @@ Item {
             fillMode: Image.PreserveAspectFit
             width: parent.width
             height: parent.height
-            scale: ql.zoom
+            scale: quickLook.zoom
             transformOrigin: Item.Center
-            x: (parent.width - width) / 2 + ql.panX
-            y: (parent.height - height) / 2 + ql.panY
+            x: (parent.width - width) / 2 + quickLook.panX
+            y: (parent.height - height) / 2 + quickLook.panY
             Behavior on scale { NumberAnimation { duration: 120 } }
         }
+
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
-            property real lastX
-            property real lastY
-            cursorShape: (pressed && ql.zoom > 1) ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-            onPressed: (m) => { lastX = m.x; lastY = m.y; }
-            onPositionChanged: (m) => {
-                if (pressed && ql.zoom > 1) {
-                    ql.panX += m.x - lastX;
-                    ql.panY += m.y - lastY;
-                    lastX = m.x;
-                    lastY = m.y;
+            property real lastX: 0
+            property real lastY: 0
+            cursorShape: (pressed && quickLook.zoom > 1) ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+            onPressed: (mouse) => {
+                lastX = mouse.x;
+                lastY = mouse.y;
+            }
+            onPositionChanged: (mouse) => {
+                if (pressed && quickLook.zoom > 1) {
+                    quickLook.panX += mouse.x - lastX;
+                    quickLook.panY += mouse.y - lastY;
+                    lastX = mouse.x;
+                    lastY = mouse.y;
                 }
             }
-            onDoubleClicked: { ql.zoom = ql.zoom > 1 ? 1 : 2; ql.panX = 0; ql.panY = 0; }
-            onWheel: (w) => {
-                ql.zoom = Math.max(0.2, Math.min(8, ql.zoom * (w.angleDelta.y > 0 ? 1.15 : 0.87)));
+            onDoubleClicked: {
+                quickLook.zoom = quickLook.zoom > 1 ? 1 : 2;
+                quickLook.panX = 0;
+                quickLook.panY = 0;
+            }
+            onWheel: (wheel) => {
+                const factor = wheel.angleDelta.y > 0 ? 1.15 : 0.87;
+                quickLook.zoom = Math.max(0.2, Math.min(8, quickLook.zoom * factor));
             }
         }
     }
 
-    // video
+    // ---- 2. Video Player ---------------------------------------------------
     Video {
-        id: qlVideo
+        id: videoPlayer
+        visible: quickLook.isVideo
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -26
         width: Math.min(parent.width - 96, 1280)
         height: Math.min(parent.height - 168, width * 9 / 16)
-        visible: ql.video
-        source: ql.video ? ql.source : ""
+        source: quickLook.isVideo ? quickLook.mediaSource : ""
         fillMode: VideoOutput.PreserveAspectFit
         autoPlay: true
         onSourceChanged: if (source !== "") play()
 
         MouseArea {
             anchors.fill: parent
-            onClicked: qlVideo.playbackState === MediaPlayer.PlayingState ? qlVideo.pause() : qlVideo.play()
+            onClicked: {
+                if (videoPlayer.playbackState === MediaPlayer.PlayingState) videoPlayer.pause();
+                else videoPlayer.play();
+            }
         }
     }
 
-    // video controls
-    Column {
-        id: videoControls
-        visible: ql.video
+    SeekBar {
+        visible: quickLook.isVideo
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 18
         anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - 96, 900)
-        spacing: 10
-
-        Row {
-            width: parent.width
-            spacing: 10
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 52
-                text: Utils.fmtClock(qlVideo.position)
-                color: Appearance.colors.colSubtext
-                
-                font.pixelSize: 10
-            }
-            SeekBar {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 52 - 52 - 20
-                position: qlVideo.position
-                duration: qlVideo.duration
-                onSeekRequested: (pos) => qlVideo.position = pos
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 52
-                horizontalAlignment: Text.AlignRight
-                text: Utils.fmtClock(qlVideo.duration)
-                color: Appearance.colors.colSubtext
-                
-                font.pixelSize: 10
-            }
-        }
-
-        MediaControls {
-            anchors.horizontalCenter: parent.horizontalCenter
-            playing: qlVideo.playbackState === MediaPlayer.PlayingState
-            rewindGlyph: "fast_rewind"
-            forwardGlyph: "fast_forward"
-            onRewind: qlVideo.position = Math.max(0, qlVideo.position - 10000)
-            onForward: qlVideo.position = Math.min(qlVideo.duration, qlVideo.position + 10000)
-            onTogglePlay: qlVideo.playbackState === MediaPlayer.PlayingState
-                          ? qlVideo.pause() : qlVideo.play()
-        }
+        width: Math.min(parent.width - 96, 700)
+        player: videoPlayer
     }
 
-    // audio
+    // ---- 3. Audio Player ---------------------------------------------------
     MediaPlayer {
-        id: qlAudio
+        id: audioPlayer
         audioOutput: AudioOutput {}
-        source: ql.audio ? ql.source : ""
+        source: quickLook.isAudio ? quickLook.mediaSource : ""
         onSourceChanged: stop()
     }
+
     Rectangle {
-        visible: ql.audio
+        visible: quickLook.isAudio
         anchors.centerIn: parent
         width: Math.min(parent.width - 96, 460)
         height: 220
@@ -236,68 +221,42 @@ Item {
                 color: Appearance.colors.colPrimary
                 iconSize: 44
             }
+
             Text {
                 width: parent.width
-                text: ql.entry ? ql.entry.name : ""
+                text: quickLook.entry ? quickLook.entry.name : ""
                 color: Appearance.colors.colOnLayer0
-                
                 font.pixelSize: 13
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideMiddle
             }
+
             SeekBar {
                 width: parent.width
-                position: qlAudio.position
-                duration: qlAudio.duration
-                onSeekRequested: (pos) => qlAudio.position = pos
-            }
-            Row {
-                width: parent.width
-                Text {
-                    width: parent.width / 2
-                    text: Utils.fmtClock(qlAudio.position)
-                    color: Appearance.colors.colSubtext
-                    
-                    font.pixelSize: 10
-                }
-                Text {
-                    width: parent.width / 2
-                    horizontalAlignment: Text.AlignRight
-                    text: Utils.fmtClock(qlAudio.duration)
-                    color: Appearance.colors.colSubtext
-                    
-                    font.pixelSize: 10
-                }
-            }
-            MediaControls {
-                anchors.horizontalCenter: parent.horizontalCenter
-                playing: qlAudio.playbackState === MediaPlayer.PlayingState
-                onRewind: qlAudio.position = Math.max(0, qlAudio.position - 10000)
-                onForward: qlAudio.position = Math.min(qlAudio.duration, qlAudio.position + 10000)
-                onTogglePlay: qlAudio.playbackState === MediaPlayer.PlayingState
-                              ? qlAudio.pause() : qlAudio.play()
+                player: audioPlayer
             }
         }
     }
 
-    // text / code
+    // ---- 4. Text / Code Viewer ---------------------------------------------
     Flickable {
-        id: textStage
-        visible: ql.textMode
+        id: textFlickable
+        visible: quickLook.isText
         anchors.fill: parent
         anchors.margins: 40
         anchors.topMargin: 64
         anchors.bottomMargin: 44
         clip: true
-        contentWidth: qlTextEdit.contentWidth + 8
-        contentHeight: qlTextEdit.contentHeight + 8
+        contentWidth: textEditor.contentWidth + 8
+        contentHeight: textEditor.contentHeight + 8
         boundsBehavior: Flickable.StopAtBounds
 
         TextEdit {
-            id: qlTextEdit
-            x: 4; y: 4
-            width: textStage.width
-            text: ql.text
+            id: textEditor
+            x: 4
+            y: 4
+            width: textFlickable.width
+            text: quickLook.textContent
             readOnly: true
             wrapMode: TextEdit.NoWrap
             color: Appearance.colors.colOnLayer0
@@ -308,53 +267,66 @@ Item {
         }
     }
 
-    // fallback: dirs, binaries, empty text
+    // ---- 5. Fallback Info View (for folders and binary files) --------------
     Column {
+        visible: quickLook.isFallback
         anchors.centerIn: parent
         spacing: 12
-        visible: ql.fallback
+
         MaterialSymbol {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ql.entry ? Utils.iconFor(ql.entry, win.xdgDirs) : "description"
+            text: Utils.iconFor(quickLook.entry, quickLook.xdgDirs)
             color: Appearance.colors.colPrimary
             iconSize: 72
         }
+
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ql.entry ? ql.entry.name : ""
+            text: quickLook.entry ? quickLook.entry.name : ""
             color: Appearance.colors.colOnLayer0
-            
             font.pixelSize: 15
         }
+
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: Utils.describe(ql.entry)
+            text: Utils.describe(quickLook.entry)
             color: Appearance.colors.colSubtext
-            
             font.pixelSize: 11
         }
     }
 
-    // header + hint
+    // ---- Top Header Bar ----------------------------------------------------
     Rectangle {
-        anchors { left: parent.left; right: parent.right; top: parent.top }
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+        }
         height: 48
         color: Qt.rgba(0, 0, 0, 0.35)
+
         Text {
-            anchors { left: parent.left; leftMargin: 18; verticalCenter: parent.verticalCenter }
+            anchors {
+                left: parent.left
+                leftMargin: 18
+                verticalCenter: parent.verticalCenter
+            }
             width: parent.width - 260
-            text: ql.entry ? ql.entry.name : ""
+            text: quickLook.entry ? quickLook.entry.name : ""
             color: Appearance.colors.colOnLayer0
-            
             font.pixelSize: 13
             elide: Text.ElideMiddle
         }
+
         Text {
-            anchors { right: parent.right; rightMargin: 18; verticalCenter: parent.verticalCenter }
-            text: (ql.index + 1) + " / " + ql.total
-                  + "   \u2190\u2192 next \u00b7 +/\u2212 zoom \u00b7 Esc close"
+            anchors {
+                right: parent.right
+                rightMargin: 18
+                verticalCenter: parent.verticalCenter
+            }
+            text: (quickLook.index + 1) + " / " + quickLook.total
+                + "   ←→ next · +/− zoom · Esc close"
             color: Appearance.colors.colSubtext
-            
             font.pixelSize: 10
         }
     }

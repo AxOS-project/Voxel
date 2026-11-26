@@ -2,66 +2,76 @@ import QtQuick
 import QtMultimedia
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
+import Voxel
 import "../Utils.js" as Utils
 
-// Right-hand preview panel: photo, audio player, text snippet or metadata.
+// Right-side panel showing a preview of the currently selected file (image, audio, text, or info).
 Rectangle {
     id: panel
-    property bool shown: true
+
+    property bool shown: false
     property var entry: null
-    property string imageSource: ""
-    property string audioSource: ""
-    property string textSample: ""
+    property var xdgDirs: ({})
 
-    readonly property bool image: Utils.isImage(entry)
-    readonly property bool audio: Utils.isAudio(entry)
-    readonly property bool text: Utils.isText(entry) && textSample !== ""
+    Preview { id: preview }
 
-    width: shown ? 320 : 0
+    readonly property bool isImage: Utils.isImage(panel.entry)
+    readonly property bool isAudio: Utils.isAudio(panel.entry)
+    readonly property string mediaUri: (panel.entry && !panel.entry.dir)
+        ? Utils.fileUri(panel.entry.path)
+        : ""
+    readonly property string textSample: (panel.shown && Utils.isText(panel.entry))
+        ? preview.read_text(panel.entry.path, 8000)
+        : ""
+    readonly property bool isText: Utils.isText(panel.entry) && panel.textSample !== ""
+
+    width: panel.shown ? 320 : 0
     radius: Appearance.rounding.small
     color: Appearance.colors.colLayer2
     border.width: 1
     border.color: Appearance.colors.colOutlineVariant
     clip: true
     visible: width > 1
-    opacity: shown ? 1 : 0
+    opacity: panel.shown ? 1 : 0
+
     Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     Behavior on opacity { NumberAnimation { duration: 140 } }
 
-    // Declared here so playback state survives selection changes.
     MediaPlayer {
-        id: player
-        source: panel.audio ? panel.audioSource : ""
+        id: audioPlayer
+        source: (panel.shown && panel.isAudio) ? panel.mediaUri : ""
         audioOutput: AudioOutput { volume: 1.0 }
-        onSourceChanged: player.stop()
+        onSourceChanged: audioPlayer.stop()
     }
-    onShownChanged: if (!shown) player.stop()
+
+    onShownChanged: if (!panel.shown) audioPlayer.stop()
 
     Flickable {
         anchors.fill: parent
         anchors.margins: 12
         contentWidth: width
-        contentHeight: body.height
+        contentHeight: bodyColumn.height
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
         Column {
-            id: body
+            id: bodyColumn
             width: parent.width
             spacing: 12
 
-            // photo
+            // Image preview
             Rectangle {
+                visible: panel.isImage
                 width: parent.width
-                height: panel.image ? Math.round(width * 0.72) : 0
-                visible: panel.image
+                height: panel.isImage ? Math.round(width * 0.72) : 0
                 radius: Appearance.rounding.small
                 color: Appearance.colors.colLayer0
                 clip: true
+
                 Image {
                     anchors.fill: parent
                     anchors.margins: 2
-                    source: panel.imageSource
+                    source: panel.isImage ? panel.mediaUri : ""
                     asynchronous: true
                     cache: false
                     sourceSize.width: 1024
@@ -71,11 +81,11 @@ Rectangle {
                 }
             }
 
-            // audio
+            // Audio player
             Rectangle {
+                visible: panel.isAudio
                 width: parent.width
                 height: 208
-                visible: panel.audio
                 radius: Appearance.rounding.small
                 color: Appearance.colors.colLayer0
 
@@ -90,6 +100,7 @@ Rectangle {
                         color: Appearance.colors.colPrimary
                         iconSize: 38
                     }
+
                     Text {
                         width: parent.width
                         text: panel.entry ? panel.entry.name : ""
@@ -101,57 +112,30 @@ Rectangle {
 
                     SeekBar {
                         width: parent.width
-                        position: player.position
-                        duration: player.duration
-                        onSeekRequested: (pos) => player.position = pos
-                    }
-
-                    Row {
-                        width: parent.width
-                        Text {
-                            width: parent.width / 2
-                            text: Utils.fmtClock(player.position)
-                            color: Appearance.colors.colSubtext
-                            
-                            font.pixelSize: 10
-                        }
-                        Text {
-                            width: parent.width / 2
-                            horizontalAlignment: Text.AlignRight
-                            text: Utils.fmtClock(player.duration)
-                            color: Appearance.colors.colSubtext
-                            
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    MediaControls {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        playing: player.playbackState === MediaPlayer.PlayingState
-                        onRewind: player.position = Math.max(0, player.position - 10000)
-                        onForward: player.position = Math.min(player.duration, player.position + 10000)
-                        onTogglePlay: player.playbackState === MediaPlayer.PlayingState ? player.pause() : player.play()
+                        player: audioPlayer
                     }
                 }
             }
 
-            // text / code snippet
+            // Text / code snippet
             Rectangle {
+                visible: panel.isText
                 width: parent.width
                 height: 200
-                visible: panel.text
                 radius: Appearance.rounding.small
                 color: Appearance.colors.colLayer0
                 clip: true
+
                 Flickable {
                     anchors.fill: parent
                     anchors.margins: 10
                     clip: true
-                    contentWidth: panelText.contentWidth
-                    contentHeight: panelText.contentHeight
+                    contentWidth: codeView.contentWidth
+                    contentHeight: codeView.contentHeight
                     boundsBehavior: Flickable.StopAtBounds
+
                     TextEdit {
-                        id: panelText
+                        id: codeView
                         width: parent.width
                         text: panel.textSample
                         readOnly: true
@@ -165,25 +149,21 @@ Rectangle {
                 }
             }
 
-            // generic file
-            Column {
-                width: parent.width
-                spacing: 10
-                visible: panel.entry !== null && !panel.image && !panel.audio && !panel.text
-                
-                MaterialSymbol {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: Utils.iconFor(panel.entry, win.xdgDirs)
-                    color: Appearance.colors.colPrimary
-                    iconSize: 44
-                }
+            // Generic icon for folders or non-previewable files
+            MaterialSymbol {
+                visible: panel.entry !== null && !panel.isImage && !panel.isAudio && !panel.isText
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: Utils.iconFor(panel.entry, panel.xdgDirs)
+                color: Appearance.colors.colPrimary
+                iconSize: 44
             }
 
-            // details
+            // File name, type/size summary, and full path
             Column {
+                visible: panel.entry !== null
                 width: parent.width
                 spacing: 6
-                visible: panel.entry !== null
+
                 Text {
                     width: parent.width
                     text: panel.entry ? panel.entry.name : ""
@@ -192,6 +172,7 @@ Rectangle {
                     font.weight: Font.Medium
                     wrapMode: Text.WrapAnywhere
                 }
+
                 Text {
                     width: parent.width
                     text: Utils.describe(panel.entry)
@@ -199,29 +180,26 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
+
                 Text {
                     width: parent.width
-                    visible: panel.entry !== null
                     text: panel.entry ? panel.entry.path : ""
-                    color: Appearance.colors.colSubtext    
+                    color: Appearance.colors.colSubtext
                     font.pixelSize: 10
                     opacity: 0.7
                     wrapMode: Text.WrapAnywhere
                 }
             }
 
-            // no selection
+            // Placeholder when no file is selected
             Text {
-                width: parent.width
                 visible: panel.entry === null
+                width: parent.width
                 text: "Nothing selected"
                 color: Appearance.colors.colSubtext
-                
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
             }
-
-            Item { width: 1; height: 4 }
         }
     }
 }

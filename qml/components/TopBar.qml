@@ -1,18 +1,20 @@
 import QtQuick
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
-import "../Utils.js" as Utils
 
-Item {
-    id: top
+// Top navigation toolbar with back/forward buttons, path breadcrumbs, sorting, and search.
+Rectangle {
+    id: topBar
+
     height: 52
+    color: Appearance.colors.colLayer2
 
     property var crumbs: []
     property string curPath: ""
     property bool showHidden: false
-    property bool previewVisible: true
+    property bool previewVisible: false
     property int trashCount: 0
-    property alias filter: search.text
+    property alias filter: searchBox.text
     property string sortBy: "Name"
     property bool rowLayout: false
 
@@ -22,7 +24,7 @@ Item {
     signal goHome()
     signal refresh()
     signal navigate(string path)
-    signal dropRequested(string path, var uris, bool internal)
+    signal dropRequested(string path, var uris, bool isInternal)
     signal toggleHidden()
     signal togglePreview()
     signal openTrash()
@@ -33,85 +35,94 @@ Item {
     signal rowLayoutToggled()
     signal sortChanged(string sortBy)
 
-    function focusSearch() { search.focusInput(); }
-    function typeSearch(ch) { search.appendInput(ch); }
+    function focusSearch() { searchBox.focusInput(); }
+    function typeSearch(character) { searchBox.appendInput(character); }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Appearance.colors.colLayer2
-    }
-
+    // Left navigation buttons
     Row {
         id: navButtons
-        anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
-        spacing: 6
-
-        BarButton { glyph: "chevron_left"; onActivated: top.goBack() }
-        BarButton { glyph: "chevron_right"; onActivated: top.goForward() }
-        BarButton { glyph: "arrow_upward"; onActivated: top.goUp() }
-        BarButton { glyph: "home"; onActivated: top.goHome() }
-        BarButton { glyph: "refresh"; onActivated: top.refresh() }
-    }
-
-    Breadcrumbs {
-        id: crumbsView
         anchors {
-            left: navButtons.right; leftMargin: 10
-            right: tools.left; rightMargin: 12
+            left: parent.left
+            leftMargin: 14
             verticalCenter: parent.verticalCenter
         }
-        model: top.crumbs
-        currentPath: top.curPath
-        onNavigate: (path) => top.navigate(path)
-        onDropRequested: (path, uris, internal) => top.dropRequested(path, uris, internal)
+        spacing: 6
+
+        BarButton { glyph: "chevron_left"; onActivated: topBar.goBack() }
+        BarButton { glyph: "chevron_right"; onActivated: topBar.goForward() }
+        BarButton { glyph: "arrow_upward"; onActivated: topBar.goUp() }
+        BarButton { glyph: "home"; onActivated: topBar.goHome() }
+        BarButton { glyph: "refresh"; onActivated: topBar.refresh() }
     }
 
+    // Center folder path breadcrumbs
+    Breadcrumbs {
+        anchors {
+            left: navButtons.right
+            leftMargin: 10
+            right: toolButtons.left
+            rightMargin: 12
+            verticalCenter: parent.verticalCenter
+        }
+        model: topBar.crumbs
+        currentPath: topBar.curPath
+        onNavigate: (path) => topBar.navigate(path)
+        onDropRequested: (path, uris, isInternal) => topBar.dropRequested(path, uris, isInternal)
+    }
+
+    // Right view & search controls
     Row {
-        id: tools
-        anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
+        id: toolButtons
+        anchors {
+            right: parent.right
+            rightMargin: 14
+            verticalCenter: parent.verticalCenter
+        }
         spacing: 6
 
         IconComboBox {
-            id: sortCombo
             anchors.verticalCenter: parent.verticalCenter
             implicitHeight: 32
             icon: "sort"
             model: ["Name", "Date", "Size", "Type"]
-            currentIndex: Math.max(0, model.indexOf(top.sortBy))
+            currentIndex: Math.max(0, model.indexOf(topBar.sortBy))
             onActivated: (index) => {
-                top.sortChanged(model[index]);
-                top.escaped();
+                topBar.sortChanged(model[index]);
+                topBar.escaped();
             }
         }
 
         BarButton {
-            glyph: top.rowLayout ? "view_list" : "view_module"
-            active: top.rowLayout
-            onActivated: top.rowLayoutToggled()
+            glyph: topBar.rowLayout ? "view_list" : "view_module"
+            active: topBar.rowLayout
+            onActivated: topBar.rowLayoutToggled()
         }
 
         SearchField {
-            id: search
+            id: searchBox
             width: 180
-            onAccepted: top.searchAccepted()
-            onMoveUp: top.moveUp()
-            onMoveDown: top.moveDown()
-            onEscaped: top.escaped()
+            onAccepted: topBar.searchAccepted()
+            onMoveUp: topBar.moveUp()
+            onMoveDown: topBar.moveDown()
+            onEscaped: topBar.escaped()
         }
+
         BarButton {
-            glyph: top.showHidden ? "visibility" : "visibility_off"
-            active: top.showHidden
-            onActivated: top.toggleHidden()
+            glyph: topBar.showHidden ? "visibility" : "visibility_off"
+            active: topBar.showHidden
+            onActivated: topBar.toggleHidden()
         }
+
         BarButton {
             glyph: "description"
-            active: top.previewVisible
-            onActivated: top.togglePreview()
+            active: topBar.previewVisible
+            onActivated: topBar.togglePreview()
         }
+
         BarButton {
             glyph: "delete"
-            active: top.trashCount > 0
-            onActivated: top.openTrash()
+            active: topBar.trashCount > 0
+            onActivated: topBar.openTrash()
         }
     }
 }

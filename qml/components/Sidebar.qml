@@ -4,92 +4,110 @@ import QtQuick.Controls
 import SleexUiKit.Appearance
 import SleexUiKit.Widgets
 import Voxel
-import "../Utils.js" as Utils
 
+// Left sidebar showing standard user folders (Home, Documents, etc.) and removable drives.
 Rectangle {
     id: sidebar
+
     width: 250
     color: Appearance.colors.colLayer2
 
     Udisk { id: udisk }
 
-    signal navigate(string path)
     property string curPath: ""
     property var xdgDirs: ({})
-    property var udiskDevices: (udisk.list_devices() ? JSON.parse(udisk.list_devices()) : [])
+    property var udiskDevices: []
     property string lastUdiskJson: ""
 
-    function refreshDevices() {
-        let json = udisk.list_devices();
-        if (json !== sidebar.lastUdiskJson && !json.startsWith("error:")) {
-            sidebar.lastUdiskJson = json;
-            sidebar.udiskDevices = JSON.parse(json);
+    signal navigate(string path)
+
+    // Combine standard user folders and connected drives into a single list.
+    readonly property var places: {
+        const list = [];
+        const dirs = sidebar.xdgDirs || {};
+
+        function addPlace(name, path, icon) {
+            if (!path) return;
+            list.push({
+                name: name,
+                path: path,
+                glyph: icon,
+                isSeparator: false,
+                isDrive: false,
+                mounted: false,
+                mountPoint: ""
+            });
         }
+
+        addPlace("Home", dirs.home, "home");
+        addPlace("Desktop", dirs.desktop, "desktop_windows");
+        addPlace("Documents", dirs.documents, "description");
+        addPlace("Downloads", dirs.download, "file_download");
+        addPlace("Music", dirs.music, "library_music");
+        addPlace("Pictures", dirs.pictures, "photo_library");
+        addPlace("Videos", dirs.videos, "video_library");
+
+        if (sidebar.udiskDevices.length > 0) {
+            list.push({
+                name: "",
+                path: "",
+                glyph: "",
+                isSeparator: true,
+                isDrive: false,
+                mounted: false,
+                mountPoint: ""
+            });
+
+            for (let i = 0; i < sidebar.udiskDevices.length; i++) {
+                const drive = sidebar.udiskDevices[i];
+                list.push({
+                    name: drive.name,
+                    path: drive.path,
+                    glyph: "hard_disk",
+                    isSeparator: false,
+                    isDrive: true,
+                    mounted: !!drive.mounted,
+                    mountPoint: drive.mount_point || ""
+                });
+            }
+        }
+
+        return list;
+    }
+
+    function refreshDevices() {
+        const json = udisk.list_devices();
+        if (!json || json === sidebar.lastUdiskJson || json.startsWith("error:")) return;
+        sidebar.lastUdiskJson = json;
+        try {
+            sidebar.udiskDevices = JSON.parse(json);
+        } catch (e) {
+            sidebar.udiskDevices = [];
+        }
+    }
+
+    function updateSelectedRow() {
+        for (let i = 0; i < sidebar.places.length; i++) {
+            const item = sidebar.places[i];
+            const targetPath = item.isDrive ? item.mountPoint : item.path;
+            if (targetPath !== "" && targetPath === sidebar.curPath) {
+                listView.currentIndex = i;
+                return;
+            }
+        }
+        listView.currentIndex = -1;
     }
 
     Component.onCompleted: refreshDevices()
-
-    ListModel {
-        id: dirModel
-    }
-
-    onXdgDirsChanged: {
-        dirModel.clear();
-        if (!xdgDirs || !xdgDirs.home) return;
-        
-        // Adding udisk objects to prevent errors when accessing properties of undefined objects
-        let def = { isUdisk: false, mounted: false, isSeparator: false, mount_point: "" };
-
-        dirModel.append(Object.assign({ name: "Home", path: xdgDirs.home, glyph: "home" }, def));
-        if (xdgDirs.desktop) dirModel.append(Object.assign({ name: "Desktop", path: xdgDirs.desktop, glyph: "desktop_windows" }, def));
-        if (xdgDirs.documents) dirModel.append(Object.assign({ name: "Documents", path: xdgDirs.documents, glyph: "description" }, def));
-        if (xdgDirs.download) dirModel.append(Object.assign({ name: "Downloads", path: xdgDirs.download, glyph: "file_download" }, def));
-        if (xdgDirs.music) dirModel.append(Object.assign({ name: "Music", path: xdgDirs.music, glyph: "library_music" }, def));
-        if (xdgDirs.pictures) dirModel.append(Object.assign({ name: "Pictures", path: xdgDirs.pictures, glyph: "photo_library" }, def));
-        if (xdgDirs.videos) dirModel.append(Object.assign({ name: "Videos", path: xdgDirs.videos, glyph: "video_library" }, def));
-    }
-
-    onUdiskDevicesChanged: {
-        for (let i = dirModel.count - 1; i >= 0; i--) {
-            if (dirModel.get(i).isUdisk || dirModel.get(i).isSeparator) {
-                dirModel.remove(i);
-            }
-        }
-
-        if (udiskDevices.length > 0) {
-            dirModel.append({ name: "", path: "", mount_point: "", glyph: "", isUdisk: false, mounted: false, isSeparator: true });
-        }
-
-        for (let device of udiskDevices) {
-            dirModel.append({
-                name: device.name,
-                path: device.path,
-                mount_point: device.mount_point,
-                glyph: "hard_disk",
-                isUdisk: true,
-                mounted: device.mounted
-            });
-        }
-    }
-
-    onCurPathChanged: {
-        let found = false;
-        for (let i = 0; i < dirModel.count; i++) {
-            if (dirModel.get(i).path === sidebar.curPath) {
-                listView.currentIndex = i;
-                found = true;
-                break;
-            }
-        }
-        if (!found) listView.currentIndex = -1;
-    }
+    onCurPathChanged: updateSelectedRow()
+    onPlacesChanged: updateSelectedRow()
 
     ListView {
         id: listView
         anchors.fill: parent
         anchors.margins: 8
         anchors.topMargin: 12
-        model: dirModel
+        model: sidebar.places
         spacing: 8
         clip: true
         highlightMoveDuration: 100
@@ -108,57 +126,90 @@ Rectangle {
                 height: 15
                 radius: Appearance.rounding.full
                 color: Appearance.colors.colPrimary
-                z: 2
-            }
-
-            NumberAnimation on y {
-                duration: 250
-                easing.type: Appearance.animation.elementMoveEnter.type
-                easing.bezierCurve: Appearance.animationCurves.emphasizedLastHalf
             }
         }
 
         delegate: Item {
             id: row
-            width: ListView.view.width
-            height: model.isSeparator ? 1 : 44
+            required property var modelData
+            required property int index
 
+            width: ListView.view.width
+            height: row.modelData.isSeparator ? 1 : 44
+
+            // Divider line between standard folders and drives
             Rectangle {
+                visible: row.modelData.isSeparator
                 anchors.centerIn: parent
                 width: parent.width - 48
                 height: 1
                 color: Appearance.colors.colOutlineVariant
-                visible: model.isSeparator === true
             }
 
-            RowLayout {
-                anchors { left: parent.left; verticalCenter: parent.verticalCenter; leftMargin: 24 }
-                spacing: 12
-                z: 1
-                visible: !model.isSeparator
+            // Hover background
+            Rectangle {
+                visible: !row.modelData.isSeparator
+                anchors.fill: parent
+                radius: Appearance.rounding.small
+                color: mouseArea.containsMouse && listView.currentIndex !== row.index
+                    ? Appearance.colors.colSurfaceContainerHigh
+                    : "transparent"
+            }
 
-                MaterialSymbol { 
-                    text: model.glyph
+            // Click handler to open folder or mount drive
+            MouseArea {
+                id: mouseArea
+                visible: !row.modelData.isSeparator
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: {
+                    if (!row.modelData.isDrive) {
+                        sidebar.navigate(row.modelData.path);
+                        return;
+                    }
+                    if (!row.modelData.mounted) {
+                        const mountResult = udisk.mount_device(row.modelData.path);
+                        if (!mountResult.startsWith("error:")) {
+                            sidebar.refreshDevices();
+                            sidebar.navigate(mountResult);
+                        }
+                    } else {
+                        sidebar.navigate(row.modelData.mountPoint);
+                    }
+                }
+            }
+
+            // Folder/drive icon, name, and eject button
+            RowLayout {
+                visible: !row.modelData.isSeparator
+                anchors {
+                    left: parent.left
+                    leftMargin: 24
+                    verticalCenter: parent.verticalCenter
+                }
+                spacing: 12
+
+                MaterialSymbol {
+                    text: row.modelData.glyph
                     iconSize: 20
                 }
-                
+
                 Label {
-                    text: model.name
+                    text: row.modelData.name
                     color: Appearance.colors.colOnLayer0
                 }
 
                 RippleButton {
-                    visible: model.isUdisk && model.mounted
+                    visible: row.modelData.isDrive && row.modelData.mounted
                     implicitWidth: 32
                     implicitHeight: 32
                     onClicked: {
-                        let result = udisk.unmount_device(model.path)
-                        if (result.startsWith("error:")) {
-                            console.error("Failed to unmount device:", result.substring(6))
-                        } else {
-                            console.log("Successfully unmounted device at path:", model.path)
-                            sidebar.refreshDevices()
-                            sidebar.navigate(xdgDirs.home)
+                        const result = udisk.unmount_device(row.modelData.path);
+                        if (!result.startsWith("error:")) {
+                            sidebar.refreshDevices();
+                            if (sidebar.xdgDirs && sidebar.xdgDirs.home) {
+                                sidebar.navigate(sidebar.xdgDirs.home);
+                            }
                         }
                     }
 
@@ -169,45 +220,10 @@ Rectangle {
                     }
                 }
             }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: Appearance.rounding.small
-                color: mouseArea.containsMouse && listView.currentIndex !== index
-                    ? Appearance.colors.colSurfaceContainerHigh
-                    : "transparent"
-                z: -1
-            }
-
-            MouseArea {
-                id: mouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {
-                    if (model.isUdisk) {
-                        if (model.mounted === false || model.mounted === "false") {
-                            console.log("Tentative de montage...");
-                            let result = udisk.mount_device(model.path)
-                            
-                            if (result.startsWith("error:")) {
-                                console.error("Erreur de montage:", result.substring(6))
-                            } else {
-                                console.log("Monté avec succès:", result)
-                                sidebar.refreshDevices()
-                                sidebar.navigate(result)
-                            }
-                        } else {
-                            console.log("Le disque est déjà monté, on navigue vers:", model.mount_point)
-                            sidebar.navigate(model.mount_point)
-                        }
-                    } else {
-                        sidebar.navigate(model.path)
-                    }
-                }
-            }
         }
     }
 
+    // Periodically check for newly plugged/unplugged USB drives
     Timer {
         interval: 2000
         running: true
