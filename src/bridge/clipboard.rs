@@ -85,4 +85,23 @@ pub struct Clipboard {
             }
         }
     ),
+
+    // Whether the system clipboard currently holds a raw image (e.g. a screenshot).
+    clipboard_has_image: qt_method!(
+        fn clipboard_has_image(&self) -> bool {
+            clipboard::has_image()
+        }
+    ),
+
+    // Paste an image from the system clipboard into `dest`.
+    // Returns the created file path on success, or "error:<msg>" on failure.
+    paste_image: qt_method!(
+        fn paste_image(&self, dest: QString) -> QString {
+            let dest = PathBuf::from(dest.to_string());
+            match clipboard::paste_image_into(&dest) {
+                Ok(path) => path.to_string_lossy().into_owned().into(),
+                Err(e) => format!("error:{e}").into(),
+            }
+        }
+    ),
 }

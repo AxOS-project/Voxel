@@ -528,6 +528,17 @@ Window {
     }
 
     function pasteClipboard() {
+        if (clipboard.clipboard_has_image()) {
+            const res = clipboard.paste_image(win.curPath);
+            if (res.startsWith("error:")) {
+                toast.show(res.slice(6));
+            } else {
+                win.cutPaths = ({});
+                toast.show("Pasted image");
+                win.refresh(res);
+            }
+            return;
+        }
         const paths = clipboard.clipboard_paths();
         if (clipboard.clipboard_count() === 0 || !paths) {
             toast.show("Clipboard is empty");
@@ -760,7 +771,7 @@ Window {
             items.push({ sep: true });
         }
 
-        if (clipboard.clipboard_count() > 0) {
+        if (clipboard.clipboard_count() > 0 || clipboard.clipboard_has_image()) {
             items.push({ label: "Paste", glyph: "content_paste", act: "paste", key: "Ctrl+V" });
         }
         items.push({ label: "New Folder", glyph: "folder", act: "newfolder", key: "Ctrl+⇧N" });
